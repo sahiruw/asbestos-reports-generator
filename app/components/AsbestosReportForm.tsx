@@ -223,6 +223,30 @@ export default function AsbestosReportForm() {
           <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">
             Survey Sections ({formData.sections.length})
           </h2>
+        </div>
+
+        {formData.sections.length === 0 ? (
+          <div className="rounded-lg border-2 border-dashed border-zinc-300 bg-zinc-50 p-8 text-center dark:border-zinc-600 dark:bg-zinc-800/50">
+            <p className="text-zinc-500 dark:text-zinc-400">
+              No sections added yet. Click &quot;Add Section&quot; to create one.
+            </p>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {formData.sections.map((section, index) => (
+              <SectionForm
+                key={section.id}
+                section={section}
+                index={index}
+                onUpdate={(s) => handleUpdateSection(index, s)}
+                onRemove={() => handleRemoveSection(index)}
+              />
+            ))}
+          </div>
+        )}
+
+        <div className="flex items-center justify-between">
+
           <button
             type="button"
             onClick={handleAddSection}
@@ -245,26 +269,6 @@ export default function AsbestosReportForm() {
             Add Section
           </button>
         </div>
-
-        {formData.sections.length === 0 ? (
-          <div className="rounded-lg border-2 border-dashed border-zinc-300 bg-zinc-50 p-8 text-center dark:border-zinc-600 dark:bg-zinc-800/50">
-            <p className="text-zinc-500 dark:text-zinc-400">
-              No sections added yet. Click &quot;Add Section&quot; to create one.
-            </p>
-          </div>
-        ) : (
-          <div className="space-y-4">
-            {formData.sections.map((section, index) => (
-              <SectionForm
-                key={section.id}
-                section={section}
-                index={index}
-                onUpdate={(s) => handleUpdateSection(index, s)}
-                onRemove={() => handleRemoveSection(index)}
-              />
-            ))}
-          </div>
-        )}
       </div>
 
       {/* Submit Button */}

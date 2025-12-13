@@ -2,6 +2,7 @@
 
 import React from "react";
 import ImageUpload, { ImageWithCaption } from "./ImageUpload";
+import { generateId } from "../utils/generateId";
 
 export interface SectionData {
   id: string;
@@ -245,7 +246,7 @@ export default function SectionForm({
 
 export function createEmptySection(): SectionData {
   return {
-    id: crypto.randomUUID(),
+    id: generateId(),
     sampleNo: "",
     idSymbol: "",
     location: "",

@@ -2,6 +2,7 @@
 
 import React, { useRef } from "react";
 import Image from "next/image";
+import { generateId } from "../utils/generateId";
 
 export interface ImageWithCaption {
   id: string;
@@ -31,10 +32,8 @@ export default function ImageUpload({
     if (!files) return;
 
     const remainingSlots = maxImages - images.length;
-    const filesToAdd = Array.from(files).slice(0, remainingSlots);
-
-    const newImages: ImageWithCaption[] = filesToAdd.map((file) => ({
-      id: crypto.randomUUID(),
+    const filesToAdd = Array.from(files).slice(0, remainingSlots);    const newImages: ImageWithCaption[] = filesToAdd.map((file) => ({
+      id: generateId(),
       file,
       preview: URL.createObjectURL(file),
       caption: "",
