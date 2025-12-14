@@ -4,8 +4,6 @@ import { ImageWithCaption, SectionData } from "../types/section";
 import { DefaultValues } from "../utils/defaults";
 import ImageUpload from "./ImageUpload";
 
-
-
 interface SectionFormProps {
   section: SectionData;
   index: number;
@@ -33,12 +31,49 @@ export default function SectionForm({
     handleChange("image", images.length > 0 ? images[0] : null);
   };
 
+  const createClearedSection = (itemMaterialProduct: string, location: string): SectionData => {
+    const clearedSection: SectionData = {
+      id: `P${index + 1}`,
+      idSymbol: "",
+      itemMaterialProduct,
+      location,
+      sampleNo: "",
+      quantityExtent: "",
+      asbestosType: "",
+      accessibility: "",
+      condition: "",
+      notAccessed: false,
+      notAccessedReason: "",
+      isExternal: false,
+      productType: 0,
+      damageDeteriorationScore: 0,
+      surfaceTreatment: 0,
+      asbestosTypeScore: 0,
+      actionLabel: "",
+      actionMonitorReinspect: "",
+      actionEncapsulateEnclose: "",
+      actionSafeSystemOfWork: "",
+      actionRemoveCompetentContractor: "",
+      actionRemoveLicensedContractor: "",
+      actionManageAccess: "",
+      image: null,
+    };
+
+    if (itemMaterialProduct && defaults[itemMaterialProduct]?.[location]) {
+      for (const [field, value] of Object.entries(defaults[itemMaterialProduct][location])) {
+        (clearedSection as any)[field] = value;
+      }
+    }
+
+    return clearedSection;
+  };
+
   // Calculate Material Assessment Total (sum of all 4 scores)
   const materialAssessmentTotal =
-    section.productType +
-    section.damageDeteriorationScore +
-    section.surfaceTreatment +
-    section.asbestosTypeScore || 0;
+    (parseInt(String(section.productType)) || 0) +
+    (parseInt(String(section.damageDeteriorationScore)) || 0)  +
+    (parseInt(String(section.surfaceTreatment)) || 0)  +
+    (parseInt(String(section.asbestosTypeScore)) || 0 )  || 0;
 
   // Total Score is the same as Material Assessment Total in this context
   const totalScore = materialAssessmentTotal;
@@ -73,37 +108,7 @@ export default function SectionForm({
             onChange={(e) => {
               const selectedValue = e.target.value; 
               const loc = defaults[selectedValue] ? Object.keys(defaults[selectedValue])[0] : ""
-              const clearedSection: SectionData = {
-                id: `P${index + 1}`,
-                idSymbol: "",
-                itemMaterialProduct: selectedValue,
-                location: loc,
-                sampleNo: "",
-                quantityExtent: "",
-                asbestosType: "",
-                accessibility: "",
-                condition: "",
-                notAccessed: false,
-                notAccessedReason: "",
-                isExternal: false,
-                productType: 0,
-                damageDeteriorationScore: 0,
-                surfaceTreatment: 0,
-                asbestosTypeScore: 0,
-                actionLabel: "",
-                actionMonitorReinspect: "",
-                actionEncapsulateEnclose: "",
-                actionSafeSystemOfWork: "",
-                actionRemoveCompetentContractor: "",
-                actionRemoveLicensedContractor: "",
-                actionManageAccess: "",
-                image: null,
-              };
-
-              for (const [field, value] of Object.entries(defaults[selectedValue!][loc!] || {})) {
-                (clearedSection as any)[field] = value;
-              }
-
+              const clearedSection = createClearedSection(selectedValue, loc);
               onUpdate(clearedSection);
             }}
             className="mt-2 w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-zinc-900 placeholder-zinc-400 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-zinc-600 dark:bg-zinc-700 dark:text-zinc-100 dark:placeholder-zinc-500"
@@ -128,37 +133,7 @@ export default function SectionForm({
             value={section.location}
             onChange={(e) => {
               const selectedValue = e.target.value; 
-              const clearedSection: SectionData = {
-                id: `P${index + 1}`,
-                idSymbol: "",
-                itemMaterialProduct: section.itemMaterialProduct,
-                location: selectedValue,
-                sampleNo: "",
-                quantityExtent: "",
-                asbestosType: "",
-                accessibility: "",
-                condition: "",
-                notAccessed: false,
-                notAccessedReason: "",
-                isExternal: false,
-                productType: 0,
-                damageDeteriorationScore: 0,
-                surfaceTreatment: 0,
-                asbestosTypeScore: 0,
-                actionLabel: "",
-                actionMonitorReinspect: "",
-                actionEncapsulateEnclose: "",
-                actionSafeSystemOfWork: "",
-                actionRemoveCompetentContractor: "",
-                actionRemoveLicensedContractor: "",
-                actionManageAccess: "",
-                image: null,
-              };
-
-              for (const [field, value] of Object.entries(defaults[section.itemMaterialProduct!][selectedValue!] || {})) {
-                (clearedSection as any)[field] = value;
-              }
-
+              const clearedSection = createClearedSection(section.itemMaterialProduct, selectedValue);
               onUpdate(clearedSection);
             }}
             className="mt-2 w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-zinc-900 placeholder-zinc-400 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-zinc-600 dark:bg-zinc-700 dark:text-zinc-100 dark:placeholder-zinc-500 disabled:bg-zinc-200 dark:disabled:bg-zinc-600"
@@ -317,7 +292,7 @@ export default function SectionForm({
                     min={1}
                     max={3}
                     value={section.productType}
-                    onChange={(e) => handleChange("productType", Math.min(3, Math.max(1, parseInt(e.target.value) || 1)))}
+                    onChange={(e) => handleChange("productType", parseInt(e.target.value))}
                     className="w-20 rounded-md border border-zinc-300 bg-white px-2 py-1 text-center text-zinc-900 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-zinc-600 dark:bg-zinc-700 dark:text-zinc-100"
                   />
                 </td>
@@ -332,7 +307,7 @@ export default function SectionForm({
                     min={0}
                     max={3}
                     value={section.damageDeteriorationScore}
-                    onChange={(e) => handleChange("damageDeteriorationScore", Math.min(3, Math.max(0, parseInt(e.target.value) || 0)))}
+                    onChange={(e) => handleChange("damageDeteriorationScore", parseInt(e.target.value))}
                     className="w-20 rounded-md border border-zinc-300 bg-white px-2 py-1 text-center text-zinc-900 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-zinc-600 dark:bg-zinc-700 dark:text-zinc-100"
                   />
                 </td>
@@ -347,7 +322,7 @@ export default function SectionForm({
                     min={0}
                     max={3}
                     value={section.surfaceTreatment}
-                    onChange={(e) => handleChange("surfaceTreatment", Math.min(3, Math.max(0, parseInt(e.target.value) || 0)))}
+                    onChange={(e) => handleChange("surfaceTreatment", parseInt(e.target.value))}
                     className="w-20 rounded-md border border-zinc-300 bg-white px-2 py-1 text-center text-zinc-900 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-zinc-600 dark:bg-zinc-700 dark:text-zinc-100"
                   />
                 </td>
@@ -362,7 +337,7 @@ export default function SectionForm({
                     min={1}
                     max={3}
                     value={section.asbestosTypeScore}
-                    onChange={(e) => handleChange("asbestosTypeScore", Math.min(3, Math.max(1, parseInt(e.target.value) || 1)))}
+                    onChange={(e) => handleChange("asbestosTypeScore", parseInt(e.target.value))}
                     className="w-20 rounded-md border border-zinc-300 bg-white px-2 py-1 text-center text-zinc-900 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-zinc-600 dark:bg-zinc-700 dark:text-zinc-100"
                   />
                 </td>
