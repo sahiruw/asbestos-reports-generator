@@ -1,6 +1,7 @@
 "use client";
 
 import { ImageWithCaption, SectionData } from "../types/section";
+import { DefaultValues } from "../utils/defaults";
 import ImageUpload from "./ImageUpload";
 
 
@@ -10,6 +11,7 @@ interface SectionFormProps {
   index: number;
   onUpdate: (section: SectionData) => void;
   onRemove: () => void;
+  defaults: DefaultValues
 }
 
 export default function SectionForm({
@@ -17,8 +19,9 @@ export default function SectionForm({
   index,
   onUpdate,
   onRemove,
+  defaults
 }: SectionFormProps) {
-  
+
   const handleChange = (
     field: keyof SectionData,
     value: string | boolean | number | ImageWithCaption | null
@@ -44,7 +47,10 @@ export default function SectionForm({
     <div className="rounded-lg border border-zinc-200 bg-white p-4 shadow-sm dark:border-zinc-700 dark:bg-zinc-800 sm:p-6">
       <div className="mb-4 flex items-center justify-between">
         <h3 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">
-          Section {index + 1}
+          Section
+          <span className="rounded-md border border-red-500 bg-red-50 p-2 ml-2 dark:border-red-700 dark:bg-red-900/20">
+            P{index + 1}
+          </span>
         </h3>
         <button
           type="button"
@@ -60,14 +66,56 @@ export default function SectionForm({
         <div>
           <label className="mb-1 block text-sm font-medium text-zinc-700 dark:text-zinc-300">
             Item/Material/Product
-          </label>
-          <input
-            type="text"
+          </label>          
+          
+          <select
             value={section.itemMaterialProduct}
-            onChange={(e) => handleChange("itemMaterialProduct", e.target.value)}
-            className="w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-zinc-900 placeholder-zinc-400 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-zinc-600 dark:bg-zinc-700 dark:text-zinc-100 dark:placeholder-zinc-500"
-            placeholder="Enter item/material/product"
-          />
+            onChange={(e) => {
+              const selectedValue = e.target.value; 
+              const loc = defaults[selectedValue] ? Object.keys(defaults[selectedValue])[0] : ""
+              const clearedSection: SectionData = {
+                id: `P${index + 1}`,
+                idSymbol: "",
+                itemMaterialProduct: selectedValue,
+                location: loc,
+                sampleNo: "",
+                quantityExtent: "",
+                asbestosType: "",
+                accessibility: "",
+                condition: "",
+                notAccessed: false,
+                notAccessedReason: "",
+                isExternal: false,
+                productType: 0,
+                damageDeteriorationScore: 0,
+                surfaceTreatment: 0,
+                asbestosTypeScore: 0,
+                actionLabel: "",
+                actionMonitorReinspect: "",
+                actionEncapsulateEnclose: "",
+                actionSafeSystemOfWork: "",
+                actionRemoveCompetentContractor: "",
+                actionRemoveLicensedContractor: "",
+                actionManageAccess: "",
+                image: null,
+              };
+
+              for (const [field, value] of Object.entries(defaults[selectedValue!][loc!] || {})) {
+                (clearedSection as any)[field] = value;
+              }
+
+              onUpdate(clearedSection);
+            }}
+            className="mt-2 w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-zinc-900 placeholder-zinc-400 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-zinc-600 dark:bg-zinc-700 dark:text-zinc-100 dark:placeholder-zinc-500"
+          >
+            <option value="">Select from defaults</option>
+            {Object.keys(defaults).map((item) => (
+              <option key={item} value={item}>
+                {item}
+              </option>
+            ))}
+          </select>
+
         </div>
 
         {/* Location */}
@@ -75,13 +123,53 @@ export default function SectionForm({
           <label className="mb-1 block text-sm font-medium text-zinc-700 dark:text-zinc-300">
             Location
           </label>
-          <input
-            type="text"
+          
+          <select
             value={section.location}
-            onChange={(e) => handleChange("location", e.target.value)}
-            className="w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-zinc-900 placeholder-zinc-400 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-zinc-600 dark:bg-zinc-700 dark:text-zinc-100 dark:placeholder-zinc-500"
-            placeholder="Enter location"
-          />
+            onChange={(e) => {
+              const selectedValue = e.target.value; 
+              const clearedSection: SectionData = {
+                id: `P${index + 1}`,
+                idSymbol: "",
+                itemMaterialProduct: section.itemMaterialProduct,
+                location: selectedValue,
+                sampleNo: "",
+                quantityExtent: "",
+                asbestosType: "",
+                accessibility: "",
+                condition: "",
+                notAccessed: false,
+                notAccessedReason: "",
+                isExternal: false,
+                productType: 0,
+                damageDeteriorationScore: 0,
+                surfaceTreatment: 0,
+                asbestosTypeScore: 0,
+                actionLabel: "",
+                actionMonitorReinspect: "",
+                actionEncapsulateEnclose: "",
+                actionSafeSystemOfWork: "",
+                actionRemoveCompetentContractor: "",
+                actionRemoveLicensedContractor: "",
+                actionManageAccess: "",
+                image: null,
+              };
+
+              for (const [field, value] of Object.entries(defaults[section.itemMaterialProduct!][selectedValue!] || {})) {
+                (clearedSection as any)[field] = value;
+              }
+
+              onUpdate(clearedSection);
+            }}
+            className="mt-2 w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-zinc-900 placeholder-zinc-400 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-zinc-600 dark:bg-zinc-700 dark:text-zinc-100 dark:placeholder-zinc-500 disabled:bg-zinc-200 dark:disabled:bg-zinc-600"
+            disabled={!section.itemMaterialProduct}
+         >
+            {section.itemMaterialProduct && Object.keys(defaults[section.itemMaterialProduct])?.map((loc) => (
+              <option key={loc} value={loc}>
+                {loc}
+              </option>
+            ))}
+          </select>
         </div>
 
         {/* Sample No */}
@@ -97,22 +185,6 @@ export default function SectionForm({
             placeholder="Enter sample no"
           />
         </div>
-
-        {/* ID Symbol */}
-        <div>
-          <label className="mb-1 block text-sm font-medium text-zinc-700 dark:text-zinc-300">
-            ID Symbol
-          </label>
-          <input
-            type="text"
-            value={section.idSymbol}
-            onChange={(e) => handleChange("idSymbol", e.target.value)}
-            className="w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-zinc-900 placeholder-zinc-400 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-zinc-600 dark:bg-zinc-700 dark:text-zinc-100 dark:placeholder-zinc-500"
-            placeholder="Enter ID symbol"
-          />
-        </div>
-
-      
 
         {/* Quantity/Extent */}
         <div>
@@ -148,7 +220,7 @@ export default function SectionForm({
           <label className="mb-1 block text-sm font-medium text-zinc-700 dark:text-zinc-300">
             Accessibility
           </label>
-           <input
+          <input
             type="text"
             value={section.accessibility}
             onChange={(e) => handleChange("accessibility", e.target.value)}
@@ -162,7 +234,7 @@ export default function SectionForm({
           <label className="mb-1 block text-sm font-medium text-zinc-700 dark:text-zinc-300">
             Condition
           </label>
-           <input
+          <input
             type="text"
             value={section.condition}
             onChange={(e) => handleChange("condition", e.target.value)}
@@ -220,7 +292,7 @@ export default function SectionForm({
         <h4 className="mb-4 text-sm font-semibold uppercase tracking-wide text-zinc-700 dark:text-zinc-300">
           Material Assessment Algorithm
         </h4>
-        
+
         {/* Table Layout */}
         <div className="overflow-x-auto">
           <table className="w-full border-collapse text-sm">
@@ -321,7 +393,7 @@ export default function SectionForm({
         <h4 className="mb-4 text-sm font-semibold uppercase tracking-wide text-zinc-700 dark:text-zinc-300">
           Management and Control Actions
         </h4>
-        
+
         {/* Table Layout */}
         <div className="overflow-x-auto">
           <table className="w-full border-collapse text-sm">

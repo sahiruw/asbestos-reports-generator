@@ -254,6 +254,7 @@ export default function AsbestosReportForm() {
                 index={index}
                 onUpdate={(s) => handleUpdateSection(index, s)}
                 onRemove={() => handleRemoveSection(index)}
+                defaults={defaults}
               />
             ))}
           </div>
