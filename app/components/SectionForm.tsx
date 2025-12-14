@@ -33,8 +33,8 @@ export default function SectionForm({
 
   const createClearedSection = (itemMaterialProduct: string, location: string): SectionData => {
     const clearedSection: SectionData = {
-      id: `P${index + 1}`,
-      idSymbol: "",
+      id: section.id,
+      idSymbol: `P${index + 1}`,
       itemMaterialProduct,
       location,
       sampleNo: "",

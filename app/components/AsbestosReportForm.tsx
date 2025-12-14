@@ -83,12 +83,39 @@ export default function AsbestosReportForm() {
       sections: prev.sections.filter((_, i) => i !== index),
     }));
   };
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+  const [submitSuccess, setSubmitSuccess] = useState<string | null>(null);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    console.log("Form Data:", formData);
-    // Handle form submission here
-    alert("Form submitted! Check console for data.");
+    setIsSubmitting(true);
+    setSubmitError(null);
+    setSubmitSuccess(null);
+
+    try {
+      const response = await fetch("/api/submit-report", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(formData),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || "Failed to submit report");
+      }
+
+      setSubmitSuccess(`Report submitted successfully! Report ID: ${result.reportId}`);
+      console.log("Report submitted:", result);
+    } catch (error) {
+      console.error("Error submitting report:", error);
+      setSubmitError(error instanceof Error ? error.message : "Failed to submit report");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -284,15 +311,52 @@ export default function AsbestosReportForm() {
             Add Section
           </button>
         </div>
-      </div>
-
-      {/* Submit Button */}
-      <div className="flex justify-center pt-4">
+      </div>      {/* Submit Button */}
+      <div className="flex flex-col items-center gap-4 pt-4">
+        {submitError && (
+          <div className="w-full rounded-md bg-red-50 p-4 text-center text-red-700 dark:bg-red-900/20 dark:text-red-400">
+            <p className="font-medium">Error</p>
+            <p className="text-sm">{submitError}</p>
+          </div>
+        )}
+        {submitSuccess && (
+          <div className="w-full rounded-md bg-green-50 p-4 text-center text-green-700 dark:bg-green-900/20 dark:text-green-400">
+            <p className="font-medium">Success</p>
+            <p className="text-sm">{submitSuccess}</p>
+          </div>
+        )}
         <button
           type="submit"
-          className="w-full rounded-md bg-green-600 px-8 py-3 text-lg font-semibold text-white transition-colors hover:bg-green-700 sm:w-auto"
+          disabled={isSubmitting}
+          className="w-full rounded-md bg-green-600 px-8 py-3 text-lg font-semibold text-white transition-colors hover:bg-green-700 disabled:cursor-not-allowed disabled:bg-green-400 sm:w-auto"
         >
-          Generate Report
+          {isSubmitting ? (
+            <span className="flex items-center gap-2">
+              <svg
+                className="h-5 w-5 animate-spin"
+                xmlns="http://www.w3.org/2000/svg"
+                fill="none"
+                viewBox="0 0 24 24"
+              >
+                <circle
+                  className="opacity-25"
+                  cx="12"
+                  cy="12"
+                  r="10"
+                  stroke="currentColor"
+                  strokeWidth="4"
+                />
+                <path
+                  className="opacity-75"
+                  fill="currentColor"
+                  d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                />
+              </svg>
+              Submitting...
+            </span>
+          ) : (
+            "Generate Report"
+          )}
         </button>
       </div>
     </form>
