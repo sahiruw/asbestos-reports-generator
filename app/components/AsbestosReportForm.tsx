@@ -1,20 +1,12 @@
 "use client";
 
-import React, { useState } from "react";
-import ImageUpload, { ImageWithCaption } from "./ImageUpload";
-import SectionForm, { SectionData, createEmptySection } from "./SectionForm";
+import React, { useState, useEffect } from "react";
+import ImageUpload from "./ImageUpload";
+import SectionForm from "./SectionForm";
+import { DefaultValues } from "../utils/defaults";
+import { ImageWithCaption, SectionData, FormData } from "../types/section";
 
-export interface FormData {
-  client: string;
-  projectNo: string;
-  address: string;
-  dateOfSurvey: string;
-  reinspectionDate: string;
-  numberOfStoreys: string;
-  outbuildings: string;
-  buildingImages: ImageWithCaption[];
-  sections: SectionData[];
-}
+
 
 export default function AsbestosReportForm() {
   const [formData, setFormData] = useState<FormData>({
@@ -28,6 +20,27 @@ export default function AsbestosReportForm() {
     buildingImages: [],
     sections: [],
   });
+  const [defaults, setDefaults] = useState<DefaultValues>({});
+  const [isLoading, setIsLoading] = useState(true);
+
+  // Fetch default values from Google Sheets on component mount
+  useEffect(() => {
+    const fetchDefaults = async () => {
+      try {
+        const response = await fetch("/api/defaults");
+        if (response.ok) {
+          const data: DefaultValues = await response.json();
+          setDefaults(data);
+        }
+      } catch (error) {
+        console.error("Failed to fetch defaults:", error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchDefaults();
+  }, []);
 
   const handleInputChange = (
     field: keyof Omit<FormData, "buildingImages" | "sections">,
@@ -50,9 +63,10 @@ export default function AsbestosReportForm() {
   };
 
   const handleAddSection = () => {
+
     setFormData((prev) => ({
       ...prev,
-      sections: [...prev.sections, createEmptySection()],
+      sections: [...prev.sections, {} as SectionData],
     }));
   };
 
@@ -235,7 +249,7 @@ export default function AsbestosReportForm() {
           <div className="space-y-4">
             {formData.sections.map((section, index) => (
               <SectionForm
-                key={section.id}
+                key={`section-${index}`}
                 section={section}
                 index={index}
                 onUpdate={(s) => handleUpdateSection(index, s)}

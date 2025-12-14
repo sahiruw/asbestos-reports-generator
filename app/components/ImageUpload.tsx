@@ -3,13 +3,9 @@
 import React, { useRef } from "react";
 import Image from "next/image";
 import { generateId } from "../utils/generateId";
+import { ImageWithCaption } from "../types/section";
 
-export interface ImageWithCaption {
-  id: string;
-  file: File | null;
-  preview: string;
-  caption: string;
-}
+
 
 interface ImageUploadProps {
   images: ImageWithCaption[];
