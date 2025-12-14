@@ -12,6 +12,7 @@ interface ImageUploadProps {
   maxImages: number;
   onImagesChange: (images: ImageWithCaption[]) => void;
   label?: string;
+  isWithCaption?: boolean;
 }
 
 export default function ImageUpload({
@@ -19,6 +20,7 @@ export default function ImageUpload({
   maxImages,
   onImagesChange,
   label = "Images",
+  isWithCaption = true,
 }: ImageUploadProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
@@ -28,7 +30,8 @@ export default function ImageUpload({
     if (!files) return;
 
     const remainingSlots = maxImages - images.length;
-    const filesToAdd = Array.from(files).slice(0, remainingSlots);    const newImages: ImageWithCaption[] = filesToAdd.map((file) => ({
+    const filesToAdd = Array.from(files).slice(0, remainingSlots);
+    const newImages: ImageWithCaption[] = filesToAdd.map((file) => ({
       id: generateId(),
       file,
       preview: URL.createObjectURL(file),
@@ -74,13 +77,13 @@ export default function ImageUpload({
                 className="object-cover"
               />
             </div>
-            <input
+            {isWithCaption && (<input
               type="text"
               placeholder="Enter caption..."
               value={image.caption}
               onChange={(e) => handleCaptionChange(image.id, e.target.value)}
               className="mt-2 w-full rounded-md border border-zinc-300 bg-white px-3 py-1.5 text-sm text-zinc-900 placeholder-zinc-400 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-zinc-600 dark:bg-zinc-700 dark:text-zinc-100 dark:placeholder-zinc-500"
-            />
+            />)}
             <button
               type="button"
               onClick={() => handleRemoveImage(image.id)}

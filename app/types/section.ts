@@ -28,15 +28,6 @@ export interface SectionData {
   actionManageAccess: string;
 }
 
-
-export interface ImageWithCaption {
-  id: string;
-  file: File | null;
-  preview: string;
-  caption: string;
-}
-
-
 export interface FormData {
   client: string;
   projectNo: string;
@@ -47,4 +38,12 @@ export interface FormData {
   outbuildings: string;
   buildingImages: ImageWithCaption[];
   sections: SectionData[];
+}
+
+
+export interface ImageWithCaption {
+  id: string;
+  file: File | null;
+  preview: string;
+  caption?: string;
 }

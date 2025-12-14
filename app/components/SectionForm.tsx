@@ -479,6 +479,7 @@ export default function SectionForm({
           maxImages={1}
           onImagesChange={handleImageChange}
           label="Section Image"
+          isWithCaption= {false}
         />
       </div>
     </div>
