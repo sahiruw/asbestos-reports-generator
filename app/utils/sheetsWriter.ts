@@ -165,7 +165,7 @@ function prepareImageSheetRows(
       "building", // Image type
       index + 1, // Image order
       image.caption || "",
-      image.preview || "", // Base64 or URL of the image
+      image.uploadedImageId || "", // Uploaded image ID from the image service
     ]);
   });
 
@@ -181,7 +181,7 @@ function prepareImageSheetRows(
         "section", // Image type
         1, // Image order within section (always 1 since each section has max 1 image)
         section.image.caption || "",
-        section.image.preview || "", // Base64 or URL of the image
+        section.image.uploadedImageId || "", // Uploaded image ID from the image service
       ]);
     }
   });

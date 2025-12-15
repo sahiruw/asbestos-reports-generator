@@ -41,9 +41,14 @@ export interface FormData {
 }
 
 
+export type ImageUploadStatus = "pending" | "uploading" | "success" | "error";
+
 export interface ImageWithCaption {
   id: string;
   file: File | null;
   preview: string;
   caption?: string;
+  uploadStatus: ImageUploadStatus;
+  uploadedImageId?: string;
+  uploadError?: string;
 }
