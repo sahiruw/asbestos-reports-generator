@@ -161,7 +161,7 @@ export default function ImageUpload({
         {label} ({images.length}/{maxImages})
       </label>      {/* Image previews */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {images.map((image) => (
+        {images.map((image, index) => (
           <div
             key={image.id}
             className="relative rounded-lg border border-zinc-200 bg-zinc-50 p-2 dark:border-zinc-700 dark:bg-zinc-800"
@@ -250,7 +250,7 @@ export default function ImageUpload({
                 </div>
               )}
             </div>
-            {isWithCaption && (<input
+            {(isWithCaption && index != 0) && (<input
               type="text"
               placeholder="Enter caption..."
               value={image.caption}
