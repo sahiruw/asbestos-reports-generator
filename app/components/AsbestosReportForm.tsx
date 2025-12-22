@@ -82,10 +82,25 @@ export default function AsbestosReportForm() {
       ...prev,
       sections: prev.sections.filter((_, i) => i !== index),
     }));
-  };
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  };  const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [submitSuccess, setSubmitSuccess] = useState<string | null>(null);
+  const [isUploadingBuildingImages, setIsUploadingBuildingImages] = useState(false);
+  const [uploadingSections, setUploadingSections] = useState<Set<number>>(new Set());
+
+  const isUploading = isUploadingBuildingImages || uploadingSections.size > 0;
+
+  const handleSectionUploadingChange = (index: number, isUploading: boolean) => {
+    setUploadingSections((prev) => {
+      const newSet = new Set(prev);
+      if (isUploading) {
+        newSet.add(index);
+      } else {
+        newSet.delete(index);
+      }
+      return newSet;
+    });
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -245,14 +260,13 @@ export default function AsbestosReportForm() {
               placeholder="Describe outbuildings"
             />
           </div>
-        </div>
-
-        {/* Building Images */}
+        </div>        {/* Building Images */}
         <div className="mt-6">
           <ImageUpload
             images={formData.buildingImages}
             maxImages={5}
             onImagesChange={handleBuildingImagesChange}
+            onUploadingChange={setIsUploadingBuildingImages}
             label="Building Images"
           />
         </div>
@@ -271,8 +285,7 @@ export default function AsbestosReportForm() {
             <p className="text-zinc-500 dark:text-zinc-400">
               No sections added yet. Click &quot;Add Section&quot; to create one.
             </p>
-          </div>
-        ) : (
+          </div>        ) : (
           <div className="space-y-4">
             {formData.sections.map((section, index) => (
               <SectionForm
@@ -282,6 +295,7 @@ export default function AsbestosReportForm() {
                 onUpdate={(s) => handleUpdateSection(index, s)}
                 onRemove={() => handleRemoveSection(index)}
                 defaults={defaults}
+                onUploadingChange={(uploading) => handleSectionUploadingChange(index, uploading)}
               />
             ))}
           </div>
@@ -327,7 +341,7 @@ export default function AsbestosReportForm() {
         )}
         <button
           type="submit"
-          disabled={isSubmitting}
+          disabled={isSubmitting || isUploading}
           className="w-full rounded-md bg-green-600 px-8 py-3 text-lg font-semibold text-white transition-colors hover:bg-green-700 disabled:cursor-not-allowed disabled:bg-green-400 sm:w-auto"
         >
           {isSubmitting ? (
@@ -353,6 +367,30 @@ export default function AsbestosReportForm() {
                 />
               </svg>
               Submitting...
+            </span>
+          ) : isUploading ? (
+            <span className="flex items-center gap-2">
+              <svg
+                className="h-5 w-5 animate-spin"
+                xmlns="http://www.w3.org/2000/svg"
+                fill="none"
+                viewBox="0 0 24 24"
+              >
+                <circle
+                  className="opacity-25"
+                  cx="12"
+                  cy="12"
+                  r="10"
+                  stroke="currentColor"
+                  strokeWidth="4"
+                />
+                <path
+                  className="opacity-75"
+                  fill="currentColor"
+                  d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                />
+              </svg>
+              Uploading Images...
             </span>
           ) : (
             "Generate Report"
