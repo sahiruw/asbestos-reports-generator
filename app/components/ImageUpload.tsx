@@ -54,6 +54,7 @@ interface ImageUploadProps {
   images: ImageWithCaption[];
   maxImages: number;
   onImagesChange: (images: ImageWithCaption[]) => void;
+  onUploadingChange?: (isUploading: boolean) => void;
   label?: string;
   isWithCaption?: boolean;
 }
@@ -62,6 +63,7 @@ export default function ImageUpload({
   images,
   maxImages,
   onImagesChange,
+  onUploadingChange,
   label = "Images",
   isWithCaption = true,
 }: ImageUploadProps) {
@@ -73,6 +75,12 @@ export default function ImageUpload({
   React.useEffect(() => {
     imagesRef.current = images;
   }, [images]);
+
+  // Notify parent when uploading state changes
+  React.useEffect(() => {
+    const isUploading = images.some((img) => img.uploadStatus === "uploading");
+    onUploadingChange?.(isUploading);
+  }, [images, onUploadingChange]);
 
   const updateImageInState = useCallback(
     (imageId: string, updates: Partial<ImageWithCaption>) => {

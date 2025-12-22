@@ -9,7 +9,8 @@ interface SectionFormProps {
   index: number;
   onUpdate: (section: SectionData) => void;
   onRemove: () => void;
-  defaults: DefaultValues
+  defaults: DefaultValues;
+  onUploadingChange?: (isUploading: boolean) => void;
 }
 
 export default function SectionForm({
@@ -17,7 +18,8 @@ export default function SectionForm({
   index,
   onUpdate,
   onRemove,
-  defaults
+  defaults,
+  onUploadingChange,
 }: SectionFormProps) {
 
   const handleChange = (
@@ -507,14 +509,13 @@ export default function SectionForm({
             />
           </div>
         </div>
-      </div>
-
-      {/* Section Image */}
+      </div>      {/* Section Image */}
       <div className="mt-4">
         <ImageUpload
           images={section.image ? [section.image] : []}
           maxImages={1}
           onImagesChange={handleImageChange}
+          onUploadingChange={onUploadingChange}
           label="Section Image"
           isWithCaption= {false}
         />
