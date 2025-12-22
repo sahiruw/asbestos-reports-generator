@@ -16,9 +16,8 @@ const auth = new google.auth.GoogleAuth({
 });
 
 
-export const getGoogleServices = async () => {
-  const authClient = await auth.getClient();
-  const drive = google.drive({ version: "v3", auth: authClient });
-  const sheets = google.sheets({ version: "v4", auth: authClient });
-  return { drive, sheets  };
+export const getGoogleServices = () => {
+  const drive = google.drive({ version: "v3", auth });
+  const sheets = google.sheets({ version: "v4", auth });
+  return { drive, sheets };
 };
