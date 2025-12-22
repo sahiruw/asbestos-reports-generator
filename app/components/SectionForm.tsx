@@ -56,6 +56,8 @@ export default function SectionForm({
       actionRemoveCompetentContractor: "",
       actionRemoveLicensedContractor: "",
       actionManageAccess: "",
+      specificRecommendations: "",
+      isLicensed: false,
       image: null,
     };
 
@@ -466,9 +468,44 @@ export default function SectionForm({
                     className="w-full rounded-md border border-zinc-300 bg-white px-2 py-1 text-zinc-900 placeholder-zinc-400 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-zinc-600 dark:bg-zinc-700 dark:text-zinc-100 dark:placeholder-zinc-500"
                   />
                 </td>
-              </tr>
-            </tbody>
+              </tr>            </tbody>
           </table>
+        </div>
+      </div>
+
+      {/* Specific Recommendations and Is Licensed */}
+      <div className="mt-6 rounded-lg border border-zinc-200 bg-zinc-50 p-4 dark:border-zinc-600 dark:bg-zinc-700/50">
+        <h4 className="mb-4 text-sm font-semibold uppercase tracking-wide text-zinc-700 dark:text-zinc-300">
+          Additional Information
+        </h4>
+        
+        <div className="space-y-4">
+          {/* Is Licensed Checkbox */}
+          <label className="flex items-center gap-2">
+            <input
+              type="checkbox"
+              checked={section.isLicensed}
+              onChange={(e) => handleChange("isLicensed", e.target.checked)}
+              className="h-4 w-4 rounded border-zinc-300 text-blue-600 focus:ring-blue-500 dark:border-zinc-600"
+            />
+            <span className="text-sm text-zinc-700 dark:text-zinc-300">
+              Is Licensed?
+            </span>
+          </label>
+
+          {/* Specific Recommendations */}
+          <div>
+            <label className="mb-1 block text-sm font-medium text-zinc-700 dark:text-zinc-300">
+              Specific Recommendations
+            </label>
+            <textarea
+              value={section.specificRecommendations}
+              onChange={(e) => handleChange("specificRecommendations", e.target.value)}
+              rows={3}
+              className="w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-zinc-900 placeholder-zinc-400 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-zinc-600 dark:bg-zinc-700 dark:text-zinc-100 dark:placeholder-zinc-500"
+              placeholder="Enter specific recommendations..."
+            />
+          </div>
         </div>
       </div>
 

@@ -1,4 +1,3 @@
-
 export interface SectionData {
   id: string;
   sampleNo: string;
@@ -26,6 +25,9 @@ export interface SectionData {
   actionRemoveCompetentContractor: string;
   actionRemoveLicensedContractor: string;
   actionManageAccess: string;
+  // Additional fields
+  specificRecommendations: string;
+  isLicensed: boolean;
 }
 
 export interface FormData {
@@ -39,7 +41,6 @@ export interface FormData {
   buildingImages: ImageWithCaption[];
   sections: SectionData[];
 }
-
 
 export type ImageUploadStatus = "pending" | "uploading" | "success" | "error";
 

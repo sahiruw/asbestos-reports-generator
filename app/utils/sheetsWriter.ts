@@ -135,10 +135,12 @@ function prepareSectionSheetRows(
       section.actionLabel || "",
       section.actionMonitorReinspect || "",
       section.actionEncapsulateEnclose || "",
-      section.actionSafeSystemOfWork || "",
-      section.actionRemoveCompetentContractor || "",
+      section.actionSafeSystemOfWork || "",      section.actionRemoveCompetentContractor || "",
       section.actionRemoveLicensedContractor || "",
       section.actionManageAccess || "",
+      // Additional fields
+      section.specificRecommendations || "",
+      section.isLicensed ? "Yes" : "No",
       // Has image flag
       section.image ? "Yes" : "No",
     ];
