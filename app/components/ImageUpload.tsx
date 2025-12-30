@@ -167,7 +167,8 @@ export default function ImageUpload({
     <div className="space-y-4">
       <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300">
         {label} ({images.length}/{maxImages})
-      </label>      {/* Image previews */}
+      </label>      
+      {/* Image previews */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {images.map((image, index) => (
           <div
