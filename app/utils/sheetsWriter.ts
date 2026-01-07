@@ -11,6 +11,69 @@ const SHEETS = {
   IMAGES: "images",
 } as const;
 
+// Default starting project number
+const DEFAULT_PROJECT_PREFIX = "GHM";
+const DEFAULT_PROJECT_SUFFIX = "-AS";
+const DEFAULT_STARTING_NUMBER = 1000;
+
+/**
+ * Generates the next project number by reading the last project number from the spreadsheet
+ * Format: GHM1000-AS, GHM1001-AS, etc.
+ */
+export async function getNextProjectNumber(): Promise<string> {
+  const { sheets } = await getGoogleServices();
+
+  try {
+    // Get all values from column C (projectNo column)
+    const response = await sheets.spreadsheets.values.get({
+      spreadsheetId: REPORTS_SPREADSHEET_ID,
+      range: `${SHEETS.MAIN}!C:C`,
+    });
+
+    const values = response.data.values;
+
+    // If no data or only header, return the starting project number
+    if (!values || values.length <= 1) {
+      return `${DEFAULT_PROJECT_PREFIX}${DEFAULT_STARTING_NUMBER}${DEFAULT_PROJECT_SUFFIX}`;
+    }
+
+    // Get the last non-empty value (skip header row)
+    let lastProjectNo = "";
+    for (let i = values.length - 1; i >= 1; i--) {
+      if (values[i] && values[i][0]) {
+        lastProjectNo = values[i][0];
+        break;
+      }
+    }
+
+    // If no valid project number found, return starting number
+    if (!lastProjectNo) {
+      return `${DEFAULT_PROJECT_PREFIX}${DEFAULT_STARTING_NUMBER}${DEFAULT_PROJECT_SUFFIX}`;
+    }
+
+    // Parse the project number (format: GHM1000-AS)
+    const match = lastProjectNo.match(/^([A-Za-z]+)(\d+)(-[A-Za-z]+)?$/);
+    if (!match) {
+      // If format doesn't match, return starting number
+      console.warn(`Unexpected project number format: ${lastProjectNo}`);
+      return `${DEFAULT_PROJECT_PREFIX}${DEFAULT_STARTING_NUMBER}${DEFAULT_PROJECT_SUFFIX}`;
+    }
+
+    const prefix = match[1];
+    const number = parseInt(match[2], 10);
+    const suffix = match[3] || DEFAULT_PROJECT_SUFFIX;
+
+    // Increment the number
+    const nextNumber = number + 1;
+
+    return `${prefix}${nextNumber}${suffix}`;
+  } catch (error) {
+    console.error("Error getting next project number:", error);
+    // Return starting number on error
+    return `${DEFAULT_PROJECT_PREFIX}${DEFAULT_STARTING_NUMBER}${DEFAULT_PROJECT_SUFFIX}`;
+  }
+}
+
 /**
  * Generates a unique report ID based on project number and timestamp
  */
@@ -135,7 +198,8 @@ function prepareSectionSheetRows(
       section.actionLabel || "",
       section.actionMonitorReinspect || "",
       section.actionEncapsulateEnclose || "",
-      section.actionSafeSystemOfWork || "",      section.actionRemoveCompetentContractor || "",
+      section.actionSafeSystemOfWork || "",
+      section.actionRemoveCompetentContractor || "",
       section.actionRemoveLicensedContractor || "",
       section.actionManageAccess || "",
       // Additional fields
