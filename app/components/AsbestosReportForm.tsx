@@ -22,24 +22,33 @@ export default function AsbestosReportForm() {
   });
   const [defaults, setDefaults] = useState<DefaultValues>({});
   const [isLoading, setIsLoading] = useState(true);
-
-  // Fetch default values from Google Sheets on component mount
+  // Fetch default values and next project number from Google Sheets on component mount
   useEffect(() => {
-    const fetchDefaults = async () => {
+    const fetchInitialData = async () => {
       try {
-        const response = await fetch("/api/defaults");
-        if (response.ok) {
-          const data: DefaultValues = await response.json();
+        // Fetch defaults and next project number in parallel
+        const [defaultsResponse, projectNoResponse] = await Promise.all([
+          fetch("/api/defaults"),
+          fetch("/api/next-project-number"),
+        ]);
+
+        if (defaultsResponse.ok) {
+          const data: DefaultValues = await defaultsResponse.json();
           setDefaults(data);
         }
+
+        if (projectNoResponse.ok) {
+          const data = await projectNoResponse.json();
+          setFormData((prev) => ({ ...prev, projectNo: data.projectNo }));
+        }
       } catch (error) {
-        console.error("Failed to fetch defaults:", error);
+        console.error("Failed to fetch initial data:", error);
       } finally {
         setIsLoading(false);
       }
     };
 
-    fetchDefaults();
+    fetchInitialData();
   }, []);
 
   const handleInputChange = (
@@ -236,7 +245,7 @@ export default function AsbestosReportForm() {
               Number of Storeys
             </label>
             <input
-              type="number"
+              type="text"
               min="1"
               value={formData.numberOfStoreys}
               onChange={(e) =>
