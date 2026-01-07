@@ -245,7 +245,7 @@ export default function AsbestosReportForm() {
               Number of Storeys
             </label>
             <input
-              type="number"
+              type="text"
               min="1"
               value={formData.numberOfStoreys}
               onChange={(e) =>
