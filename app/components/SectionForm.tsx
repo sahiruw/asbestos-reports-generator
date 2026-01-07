@@ -157,6 +157,20 @@ export default function SectionForm({
           </datalist>
         </div>
 
+        {/* Override location No */}
+        <div>
+          <label className="mb-1 block text-sm font-medium text-zinc-700 dark:text-zinc-300">
+            Override Location
+          </label>
+          <input
+            type="text"
+            value={section.location}
+            onChange={(e) => handleChange("location", e.target.value)}
+            className="w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-zinc-900 placeholder-zinc-400 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-zinc-600 dark:bg-zinc-700 dark:text-zinc-100 dark:placeholder-zinc-500"
+            placeholder="Enter location to override"
+          />
+        </div>
+
         {/* Sample No */}
         <div>
           <label className="mb-1 block text-sm font-medium text-zinc-700 dark:text-zinc-300">
