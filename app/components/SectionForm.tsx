@@ -126,31 +126,35 @@ export default function SectionForm({
             ))}
           </select>
 
-        </div>
-
-        {/* Location */}
+        </div>        {/* Location */}
         <div>
           <label className="mb-1 block text-sm font-medium text-zinc-700 dark:text-zinc-300">
             Location
           </label>
           
-          <select
+          <input
+            type="text"
+            list={`location-options-${section.id}`}
             value={section.location}
             onChange={(e) => {
-              const selectedValue = e.target.value; 
-              const clearedSection = createClearedSection(section.itemMaterialProduct, selectedValue, defaults[section.itemMaterialProduct][selectedValue]?.actionRemoveLicensedContractor ? true: false);
+              const selectedValue = e.target.value;
+              const hasDefaults = section.itemMaterialProduct && defaults[section.itemMaterialProduct]?.[selectedValue];
+              const clearedSection = createClearedSection(
+                section.itemMaterialProduct,
+                selectedValue,
+                hasDefaults ? !!defaults[section.itemMaterialProduct][selectedValue]?.actionRemoveLicensedContractor : section.isLicensed
+              );
               onUpdate(clearedSection);
             }}
             className="mt-2 w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-zinc-900 placeholder-zinc-400 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-zinc-600 dark:bg-zinc-700 dark:text-zinc-100 dark:placeholder-zinc-500 disabled:bg-zinc-200 dark:disabled:bg-zinc-600"
             disabled={!section.itemMaterialProduct}
-         >
-            <option value=""></option>
-            {section.itemMaterialProduct && Object.keys(defaults[section.itemMaterialProduct])?.map((loc) => (
-              <option key={loc} value={loc}>
-                {loc}
-              </option>
+            placeholder="Type or select location"
+          />
+          <datalist id={`location-options-${section.id}`}>
+            {section.itemMaterialProduct && Object.keys(defaults[section.itemMaterialProduct] || {})?.map((loc) => (
+              <option key={loc} value={loc} />
             ))}
-          </select>
+          </datalist>
         </div>
 
         {/* Override location No */}
