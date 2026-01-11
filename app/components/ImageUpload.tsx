@@ -209,7 +209,8 @@ export default function ImageUpload({
 
   const handleRemoveImage = (id: string) => {
     const imageToRemove = images.find((img) => img.id === id);
-    if (imageToRemove?.preview) {
+    // Only revoke blob URLs (not external URLs from loaded images)
+    if (imageToRemove?.preview?.startsWith("blob:")) {
       URL.revokeObjectURL(imageToRemove.preview);
     }
     onImagesChange(images.filter((img) => img.id !== id));

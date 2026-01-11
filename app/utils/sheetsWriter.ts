@@ -255,4 +255,198 @@ function prepareImageSheetRows(
   return rows;
 }
 
+/**
+ * Constructs a viewable URL from a Google Drive file ID using our proxy API
+ */
+function getImageUrl(fileIdOrUrl: string): string {
+  if (!fileIdOrUrl) return "";
+  
+  // If it's already a full URL (not a Google Drive URL), return it as-is
+  if (fileIdOrUrl.startsWith("http://") || fileIdOrUrl.startsWith("https://")) {
+    // If it's a Google Drive URL, extract the ID and use our proxy
+    const driveMatch = fileIdOrUrl.match(/\/d\/([a-zA-Z0-9_-]+)/);
+    if (driveMatch) {
+      return `/api/image/${driveMatch[1]}`;
+    }
+    return fileIdOrUrl;
+  }
+  
+  // Use our proxy API to serve the image
+  return `/api/image/${fileIdOrUrl}`;
+}
+
+/**
+ * Converts a date string to YYYY-MM-DD format for HTML date inputs
+ * Handles formats like DD/MM/YYYY, MM/DD/YYYY, Google Sheets serial numbers, or already formatted YYYY-MM-DD
+ */
+function formatDateForInput(dateStr: string): string {
+  if (!dateStr) return "";
+  
+  // If already in YYYY-MM-DD format, return as-is
+  if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
+    return dateStr;
+  }
+  
+  // Check if it's a Google Sheets serial date number (a number like 45658)
+  const serialNumber = parseFloat(dateStr);
+  if (!isNaN(serialNumber) && serialNumber > 25000 && serialNumber < 100000) {
+    // Google Sheets uses days since December 30, 1899
+    const date = new Date((serialNumber - 25569) * 86400 * 1000);
+    return date.toISOString().split("T")[0];
+  }
+  
+  // Try to parse DD/MM/YYYY format (common in UK/AU)
+  const ddmmyyyyMatch = dateStr.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if (ddmmyyyyMatch) {
+    const day = ddmmyyyyMatch[1].padStart(2, "0");
+    const month = ddmmyyyyMatch[2].padStart(2, "0");
+    const year = ddmmyyyyMatch[3];
+    return `${year}-${month}-${day}`;
+  }
+  
+  // Try to parse using Date object as fallback
+  const parsed = new Date(dateStr);
+  if (!isNaN(parsed.getTime())) {
+    return parsed.toISOString().split("T")[0];
+  }
+  
+  // Return original if no format matches
+  return dateStr;
+}
+
+/**
+ * Reads a report from Google Sheets by report ID
+ */
+export async function getReportFromSheets(reportId: string): Promise<FormData | null> {
+  const { sheets } = await getGoogleServices();
+
+  try {
+    // Fetch data from all three sheets in parallel
+    const [mainResponse, sectionsResponse, imagesResponse] = await Promise.all([
+      sheets.spreadsheets.values.get({
+        spreadsheetId: REPORTS_SPREADSHEET_ID,
+        range: `${SHEETS.MAIN}!A:K`,
+        valueRenderOption: "FORMATTED_VALUE",
+      }),
+      sheets.spreadsheets.values.get({
+        spreadsheetId: REPORTS_SPREADSHEET_ID,
+        range: `${SHEETS.SECTIONS}!A:AC`,
+        valueRenderOption: "FORMATTED_VALUE",
+      }),
+      sheets.spreadsheets.values.get({
+        spreadsheetId: REPORTS_SPREADSHEET_ID,
+        range: `${SHEETS.IMAGES}!A:G`,
+        valueRenderOption: "FORMATTED_VALUE",
+      }),
+    ]);
+
+    const mainRows = mainResponse.data.values || [];
+    const sectionRows = sectionsResponse.data.values || [];
+    const imageRows = imagesResponse.data.values || [];
+
+    // Find the main row for this report (skip header row)
+    const mainRow = mainRows.find((row, index) => index > 0 && row[0] === reportId);
+    if (!mainRow) {
+      return null;
+    }
+
+    // Debug: log the main row to see what data we're getting
+    console.log("Main row data:", mainRow);
+
+    // Parse main data
+    // Columns: reportId, client, projectNo, address, dateOfSurvey, reinspectionDate, numberOfStoreys, outbuildings, sectionsCount, buildingImagesCount, submittedAt
+    const formData: FormData = {
+      client: mainRow[1] || "",
+      projectNo: mainRow[2] || "",
+      address: mainRow[3] || "",
+      dateOfSurvey: formatDateForInput(mainRow[4] || ""),
+      reinspectionDate: formatDateForInput(mainRow[5] || ""),
+      numberOfStoreys: mainRow[6] || "",
+      outbuildings: mainRow[7] || "",
+      buildingImages: [],
+      sections: [],
+    };
+
+    // Parse building images (filter by reportId and type = "building")
+    const buildingImageRows = imageRows.filter(
+      (row, index) => index > 0 && row[1] === reportId && row[3] === "building"
+    );
+    formData.buildingImages = buildingImageRows.map((row) => ({
+      id: row[0] || "",
+      file: null,
+      preview: getImageUrl(row[6] || ""), // Construct proper image URL
+      caption: row[5] || "",
+      uploadStatus: "success" as const,
+      uploadedImageId: row[6] || "",
+    }));
+
+    // Parse sections (filter by reportId)
+    const reportSectionRows = sectionRows.filter(
+      (row, index) => index > 0 && row[1] === reportId
+    );
+    
+    // Parse section images
+    const sectionImageRows = imageRows.filter(
+      (row, index) => index > 0 && row[1] === reportId && row[3] === "section"
+    );
+    const sectionImageMap = new Map<string, { caption: string; uploadedImageId: string }>();
+    for (const row of sectionImageRows) {
+      sectionImageMap.set(row[2], { // sectionId
+        caption: row[5] || "",
+        uploadedImageId: row[6] || "",
+      });
+    }
+
+    formData.sections = reportSectionRows.map((row) => {
+      const sectionId = row[0];
+      const imageData = sectionImageMap.get(sectionId);
+      
+      return {
+        id: sectionId,
+        sampleNo: row[3] || "",
+        idSymbol: row[4] || "",
+        location: row[5] || "",
+        itemMaterialProduct: row[6] || "",
+        quantityExtent: row[7] || "",
+        asbestosType: row[8] || "",
+        notAccessed: row[9] === "Yes",
+        notAccessedReason: row[10] || "",
+        isExternal: row[11] === "Yes",
+        accessibility: row[12] || "",
+        condition: row[13] || "",
+        // Material Assessment Algorithm scores
+        productType: parseInt(row[14], 10) || 0,
+        damageDeteriorationScore: parseInt(row[15], 10) || 0,
+        surfaceTreatment: parseInt(row[16], 10) || 0,
+        asbestosTypeScore: parseInt(row[17], 10) || 0,
+        // Management and Control Actions
+        actionLabel: row[18] || "",
+        actionMonitorReinspect: row[19] || "",
+        actionEncapsulateEnclose: row[20] || "",
+        actionSafeSystemOfWork: row[21] || "",
+        actionRemoveCompetentContractor: row[22] || "",
+        actionRemoveLicensedContractor: row[23] || "",
+        actionManageAccess: row[24] || "",
+        // Additional fields
+        specificRecommendations: row[25] || "",
+        isLicensed: row[26] === "Yes",
+        // Image
+        image: imageData ? {
+          id: sectionId + "-img",
+          file: null,
+          preview: getImageUrl(imageData.uploadedImageId), // Construct proper image URL
+          caption: imageData.caption,
+          uploadStatus: "success" as const,
+          uploadedImageId: imageData.uploadedImageId,
+        } : null,
+      } as SectionData;
+    });
+
+    return formData;
+  } catch (error) {
+    console.error("Error reading report from sheets:", error);
+    throw error;
+  }
+}
+
 
