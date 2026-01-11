@@ -6,24 +6,48 @@ import SectionForm from "./SectionForm";
 import { DefaultValues } from "../utils/defaults";
 import { ImageWithCaption, SectionData, FormData } from "../types/section";
 
+interface AsbestosReportFormProps {
+  initialData?: FormData;
+  reportId?: string;
+}
 
-
-export default function AsbestosReportForm() {
-  const [formData, setFormData] = useState<FormData>({
+export default function AsbestosReportForm({ initialData, reportId }: AsbestosReportFormProps) {
+  const [formData, setFormData] = useState<FormData>(initialData || {
     client: "",
     projectNo: "",
     address: "",
     dateOfSurvey: "",
     reinspectionDate: "",
     numberOfStoreys: "",
-    outbuildings: "",
-    buildingImages: [],
+    outbuildings: "",    buildingImages: [],
     sections: [],
   });
   const [defaults, setDefaults] = useState<DefaultValues>({});
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(!initialData); // Don't show loading if we have initial data
+  const isEditMode = !!reportId;
+
   // Fetch default values and next project number from Google Sheets on component mount
   useEffect(() => {
+    // Skip fetching project number if we're editing an existing report
+    if (isEditMode) {
+      // Only fetch defaults
+      const fetchDefaults = async () => {
+        try {
+          const defaultsResponse = await fetch("/api/defaults");
+          if (defaultsResponse.ok) {
+            const data: DefaultValues = await defaultsResponse.json();
+            setDefaults(data);
+          }
+        } catch (error) {
+          console.error("Failed to fetch defaults:", error);
+        } finally {
+          setIsLoading(false);
+        }
+      };
+      fetchDefaults();
+      return;
+    }
+
     const fetchInitialData = async () => {
       try {
         // Fetch defaults and next project number in parallel
@@ -147,10 +171,12 @@ export default function AsbestosReportForm() {
       {/* Header */}
       <div className="text-center">
         <h1 className="text-2xl font-bold text-zinc-900 dark:text-zinc-100 sm:text-3xl">
-          Asbestos Survey Report
+          {isEditMode ? "Edit Asbestos Survey Report" : "Asbestos Survey Report"}
         </h1>
         <p className="mt-2 text-zinc-600 dark:text-zinc-400">
-          Complete all fields to generate your report
+          {isEditMode
+            ? `Editing report: ${reportId}`
+            : "Complete all fields to generate your report"}
         </p>
       </div>
 
@@ -401,6 +427,8 @@ export default function AsbestosReportForm() {
               </svg>
               Uploading Images...
             </span>
+          ) : isEditMode ? (
+            "Update Report"
           ) : (
             "Generate Report"
           )}

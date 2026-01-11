@@ -255,4 +255,133 @@ function prepareImageSheetRows(
   return rows;
 }
 
+/**
+ * Reads a report from Google Sheets by report ID
+ */
+export async function getReportFromSheets(reportId: string): Promise<FormData | null> {
+  const { sheets } = await getGoogleServices();
+
+  try {
+    // Fetch data from all three sheets in parallel
+    const [mainResponse, sectionsResponse, imagesResponse] = await Promise.all([
+      sheets.spreadsheets.values.get({
+        spreadsheetId: REPORTS_SPREADSHEET_ID,
+        range: `${SHEETS.MAIN}!A:K`,
+      }),
+      sheets.spreadsheets.values.get({
+        spreadsheetId: REPORTS_SPREADSHEET_ID,
+        range: `${SHEETS.SECTIONS}!A:AC`,
+      }),
+      sheets.spreadsheets.values.get({
+        spreadsheetId: REPORTS_SPREADSHEET_ID,
+        range: `${SHEETS.IMAGES}!A:G`,
+      }),
+    ]);
+
+    const mainRows = mainResponse.data.values || [];
+    const sectionRows = sectionsResponse.data.values || [];
+    const imageRows = imagesResponse.data.values || [];
+
+    // Find the main row for this report (skip header row)
+    const mainRow = mainRows.find((row, index) => index > 0 && row[0] === reportId);
+    if (!mainRow) {
+      return null;
+    }
+
+    // Parse main data
+    // Columns: reportId, client, projectNo, address, dateOfSurvey, reinspectionDate, numberOfStoreys, outbuildings, sectionsCount, buildingImagesCount, submittedAt
+    const formData: FormData = {
+      client: mainRow[1] || "",
+      projectNo: mainRow[2] || "",
+      address: mainRow[3] || "",
+      dateOfSurvey: mainRow[4] || "",
+      reinspectionDate: mainRow[5] || "",
+      numberOfStoreys: mainRow[6] || "",
+      outbuildings: mainRow[7] || "",
+      buildingImages: [],
+      sections: [],
+    };
+
+    // Parse building images (filter by reportId and type = "building")
+    const buildingImageRows = imageRows.filter(
+      (row, index) => index > 0 && row[1] === reportId && row[3] === "building"
+    );
+    formData.buildingImages = buildingImageRows.map((row) => ({
+      id: row[0] || "",
+      file: null,
+      preview: row[6] || "", // This will be the image URL
+      caption: row[5] || "",
+      uploadStatus: "success" as const,
+      uploadedImageId: row[6] || "",
+    }));
+
+    // Parse sections (filter by reportId)
+    const reportSectionRows = sectionRows.filter(
+      (row, index) => index > 0 && row[1] === reportId
+    );
+    
+    // Parse section images
+    const sectionImageRows = imageRows.filter(
+      (row, index) => index > 0 && row[1] === reportId && row[3] === "section"
+    );
+    const sectionImageMap = new Map<string, { caption: string; uploadedImageId: string }>();
+    for (const row of sectionImageRows) {
+      sectionImageMap.set(row[2], { // sectionId
+        caption: row[5] || "",
+        uploadedImageId: row[6] || "",
+      });
+    }
+
+    formData.sections = reportSectionRows.map((row) => {
+      const sectionId = row[0];
+      const imageData = sectionImageMap.get(sectionId);
+      
+      return {
+        id: sectionId,
+        sampleNo: row[3] || "",
+        idSymbol: row[4] || "",
+        location: row[5] || "",
+        itemMaterialProduct: row[6] || "",
+        quantityExtent: row[7] || "",
+        asbestosType: row[8] || "",
+        notAccessed: row[9] === "Yes",
+        notAccessedReason: row[10] || "",
+        isExternal: row[11] === "Yes",
+        accessibility: row[12] || "",
+        condition: row[13] || "",
+        // Material Assessment Algorithm scores
+        productType: parseInt(row[14], 10) || 0,
+        damageDeteriorationScore: parseInt(row[15], 10) || 0,
+        surfaceTreatment: parseInt(row[16], 10) || 0,
+        asbestosTypeScore: parseInt(row[17], 10) || 0,
+        // Management and Control Actions
+        actionLabel: row[18] || "",
+        actionMonitorReinspect: row[19] || "",
+        actionEncapsulateEnclose: row[20] || "",
+        actionSafeSystemOfWork: row[21] || "",
+        actionRemoveCompetentContractor: row[22] || "",
+        actionRemoveLicensedContractor: row[23] || "",
+        actionManageAccess: row[24] || "",
+        // Additional fields
+        specificRecommendations: row[25] || "",
+        isLicensed: row[26] === "Yes",
+        // Image
+        image: imageData ? {
+          id: sectionId + "-img",
+          file: null,
+          preview: imageData.uploadedImageId, // This will be the image URL
+          caption: imageData.caption,
+          uploadStatus: "success" as const,
+          uploadedImageId: imageData.uploadedImageId,
+        } : null,
+      } as SectionData;
+    });
+
+    return formData;
+  } catch (error) {
+    console.error("Error reading report from sheets:", error);
+    throw error;
+  }
+}
+
 
