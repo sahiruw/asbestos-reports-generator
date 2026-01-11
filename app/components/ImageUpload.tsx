@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useRef, useCallback } from "react";
+import React, { useRef, useCallback, useState } from "react";
 import Image from "next/image";
 import { generateId } from "../utils/generateId";
 import { ImageWithCaption } from "../types/section";
@@ -70,6 +70,8 @@ export default function ImageUpload({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
   const imagesRef = useRef<ImageWithCaption[]>(images);
+  const [isDragging, setIsDragging] = useState(false);
+  const dragCounterRef = useRef(0);
 
   // Keep ref in sync with images prop
   React.useEffect(() => {
@@ -124,26 +126,76 @@ export default function ImageUpload({
     const files = e.target.files;
     if (!files) return;
 
-    const remainingSlots = maxImages - images.length;
-    const filesToAdd = Array.from(files).slice(0, remainingSlots);
-    const newImages: ImageWithCaption[] = filesToAdd.map((file) => ({
-      id: generateId(),
-      file,
-      preview: URL.createObjectURL(file),
-      caption: "",
-      uploadStatus: "pending" as const,
-    }));
-
-    const allImages = [...images, ...newImages];
-    imagesRef.current = allImages;
-    onImagesChange(allImages);
+    processFiles(Array.from(files));
     e.target.value = "";
-
-    // Start uploading each new image
-    for (const image of newImages) {
-      handleUploadImage(image);
-    }
   };
+
+  const processFiles = useCallback(
+    (files: File[]) => {
+      const remainingSlots = maxImages - imagesRef.current.length;
+      // Filter to only image files
+      const imageFiles = files.filter((file) => file.type.startsWith("image/"));
+      const filesToAdd = imageFiles.slice(0, remainingSlots);
+
+      if (filesToAdd.length === 0) return;
+
+      const newImages: ImageWithCaption[] = filesToAdd.map((file) => ({
+        id: generateId(),
+        file,
+        preview: URL.createObjectURL(file),
+        caption: "",
+        uploadStatus: "pending" as const,
+      }));
+
+      const allImages = [...imagesRef.current, ...newImages];
+      imagesRef.current = allImages;
+      onImagesChange(allImages);
+
+      // Start uploading each new image
+      for (const image of newImages) {
+        handleUploadImage(image);
+      }
+    },
+    [maxImages, onImagesChange, handleUploadImage]
+  );
+
+  const handleDragEnter = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    dragCounterRef.current++;
+    if (e.dataTransfer.types.includes("Files")) {
+      setIsDragging(true);
+    }
+  }, []);
+
+  const handleDragLeave = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    dragCounterRef.current--;
+    if (dragCounterRef.current === 0) {
+      setIsDragging(false);
+    }
+  }, []);
+
+  const handleDragOver = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+  }, []);
+
+  const handleDrop = useCallback(
+    (e: React.DragEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      setIsDragging(false);
+      dragCounterRef.current = 0;
+
+      const files = e.dataTransfer.files;
+      if (files && files.length > 0) {
+        processFiles(Array.from(files));
+      }
+    },
+    [processFiles]
+  );
 
   const handleRetryUpload = (image: ImageWithCaption) => {
     handleUploadImage(image);
@@ -164,11 +216,75 @@ export default function ImageUpload({
   };
 
   return (
-    <div className="space-y-4">
-      <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300">
+    <div
+      className={`space-y-4 relative ${
+        isDragging ? "ring-2 ring-blue-500 ring-offset-2 rounded-lg" : ""
+      }`}
+      onDragEnter={handleDragEnter}
+      onDragLeave={handleDragLeave}
+      onDragOver={handleDragOver}
+      onDrop={handleDrop}
+    >
+      {/* Drag overlay */}
+      {isDragging && (
+        <div className="absolute inset-0 z-10 flex items-center justify-center rounded-lg border-2 border-dashed border-blue-500 bg-blue-50/90 dark:bg-blue-900/90">
+          <div className="flex flex-col items-center gap-2 text-blue-600 dark:text-blue-300">
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              className="h-12 w-12"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"
+              />
+            </svg>
+            <span className="text-lg font-medium">Drop images here</span>
+            <span className="text-sm">
+              {images.length < maxImages
+                ? `${maxImages - images.length} slot${
+                    maxImages - images.length !== 1 ? "s" : ""
+                  } remaining`
+                : "Maximum images reached"}
+            </span>
+          </div>
+        </div>
+      )}      <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300">
         {label} ({images.length}/{maxImages})
-      </label>      
+      </label>
+
+      {/* Drop zone hint when no images */}
+      {images.length === 0 && (
+        <div className="flex flex-col items-center justify-center rounded-lg border-2 border-dashed border-zinc-300 bg-zinc-50 p-8 text-center dark:border-zinc-600 dark:bg-zinc-800/50">
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            className="h-10 w-10 text-zinc-400 dark:text-zinc-500"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={1.5}
+              d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
+            />
+          </svg>
+          <p className="mt-2 text-sm font-medium text-zinc-600 dark:text-zinc-400">
+            Drag & drop images here
+          </p>
+          <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-500">
+            or use the buttons below to upload
+          </p>
+        </div>
+      )}
+
       {/* Image previews */}
+      {images.length > 0 && (
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {images.map((image, index) => (
           <div
@@ -206,7 +322,9 @@ export default function ImageUpload({
                         d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
                       />
                     </svg>
-                    <span className="text-sm font-medium text-white">Uploading...</span>
+                    <span className="text-sm font-medium text-white">
+                      Uploading...
+                    </span>
                   </div>
                 </div>
               )}
@@ -259,14 +377,15 @@ export default function ImageUpload({
                 </div>
               )}
             </div>
-            {(isWithCaption && index != 0) && (<input
-              type="text"
-              placeholder="Enter caption..."
-              value={image.caption}
-              onChange={(e) => handleCaptionChange(image.id, e.target.value)}
-              className="mt-2 w-full rounded-md border border-zinc-300 bg-white px-3 py-1.5 text-sm text-zinc-900 placeholder-zinc-400 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-zinc-600 dark:bg-zinc-700 dark:text-zinc-100 dark:placeholder-zinc-500"
-            />)}
-            <button
+            {isWithCaption && index != 0 && (
+              <input
+                type="text"
+                placeholder="Enter caption..."
+                value={image.caption}
+                onChange={(e) => handleCaptionChange(image.id, e.target.value)}
+                className="mt-2 w-full rounded-md border border-zinc-300 bg-white px-3 py-1.5 text-sm text-zinc-900 placeholder-zinc-400 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-zinc-600 dark:bg-zinc-700 dark:text-zinc-100 dark:placeholder-zinc-500"
+              />
+            )}            <button
               type="button"
               onClick={() => handleRemoveImage(image.id)}
               className="absolute -right-2 -top-2 flex h-6 w-6 items-center justify-center rounded-full bg-red-500 text-white shadow-md hover:bg-red-600"
@@ -276,6 +395,7 @@ export default function ImageUpload({
           </div>
         ))}
       </div>
+      )}
 
       {/* Upload buttons */}
       {images.length < maxImages && (
