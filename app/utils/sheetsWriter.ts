@@ -276,6 +276,45 @@ function getImageUrl(fileIdOrUrl: string): string {
 }
 
 /**
+ * Converts a date string to YYYY-MM-DD format for HTML date inputs
+ * Handles formats like DD/MM/YYYY, MM/DD/YYYY, Google Sheets serial numbers, or already formatted YYYY-MM-DD
+ */
+function formatDateForInput(dateStr: string): string {
+  if (!dateStr) return "";
+  
+  // If already in YYYY-MM-DD format, return as-is
+  if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
+    return dateStr;
+  }
+  
+  // Check if it's a Google Sheets serial date number (a number like 45658)
+  const serialNumber = parseFloat(dateStr);
+  if (!isNaN(serialNumber) && serialNumber > 25000 && serialNumber < 100000) {
+    // Google Sheets uses days since December 30, 1899
+    const date = new Date((serialNumber - 25569) * 86400 * 1000);
+    return date.toISOString().split("T")[0];
+  }
+  
+  // Try to parse DD/MM/YYYY format (common in UK/AU)
+  const ddmmyyyyMatch = dateStr.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if (ddmmyyyyMatch) {
+    const day = ddmmyyyyMatch[1].padStart(2, "0");
+    const month = ddmmyyyyMatch[2].padStart(2, "0");
+    const year = ddmmyyyyMatch[3];
+    return `${year}-${month}-${day}`;
+  }
+  
+  // Try to parse using Date object as fallback
+  const parsed = new Date(dateStr);
+  if (!isNaN(parsed.getTime())) {
+    return parsed.toISOString().split("T")[0];
+  }
+  
+  // Return original if no format matches
+  return dateStr;
+}
+
+/**
  * Reads a report from Google Sheets by report ID
  */
 export async function getReportFromSheets(reportId: string): Promise<FormData | null> {
@@ -287,14 +326,17 @@ export async function getReportFromSheets(reportId: string): Promise<FormData | 
       sheets.spreadsheets.values.get({
         spreadsheetId: REPORTS_SPREADSHEET_ID,
         range: `${SHEETS.MAIN}!A:K`,
+        valueRenderOption: "FORMATTED_VALUE",
       }),
       sheets.spreadsheets.values.get({
         spreadsheetId: REPORTS_SPREADSHEET_ID,
         range: `${SHEETS.SECTIONS}!A:AC`,
+        valueRenderOption: "FORMATTED_VALUE",
       }),
       sheets.spreadsheets.values.get({
         spreadsheetId: REPORTS_SPREADSHEET_ID,
         range: `${SHEETS.IMAGES}!A:G`,
+        valueRenderOption: "FORMATTED_VALUE",
       }),
     ]);
 
@@ -308,14 +350,17 @@ export async function getReportFromSheets(reportId: string): Promise<FormData | 
       return null;
     }
 
+    // Debug: log the main row to see what data we're getting
+    console.log("Main row data:", mainRow);
+
     // Parse main data
     // Columns: reportId, client, projectNo, address, dateOfSurvey, reinspectionDate, numberOfStoreys, outbuildings, sectionsCount, buildingImagesCount, submittedAt
     const formData: FormData = {
       client: mainRow[1] || "",
       projectNo: mainRow[2] || "",
       address: mainRow[3] || "",
-      dateOfSurvey: mainRow[4] || "",
-      reinspectionDate: mainRow[5] || "",
+      dateOfSurvey: formatDateForInput(mainRow[4] || ""),
+      reinspectionDate: formatDateForInput(mainRow[5] || ""),
       numberOfStoreys: mainRow[6] || "",
       outbuildings: mainRow[7] || "",
       buildingImages: [],
