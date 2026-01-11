@@ -256,6 +256,26 @@ function prepareImageSheetRows(
 }
 
 /**
+ * Constructs a viewable URL from a Google Drive file ID using our proxy API
+ */
+function getImageUrl(fileIdOrUrl: string): string {
+  if (!fileIdOrUrl) return "";
+  
+  // If it's already a full URL (not a Google Drive URL), return it as-is
+  if (fileIdOrUrl.startsWith("http://") || fileIdOrUrl.startsWith("https://")) {
+    // If it's a Google Drive URL, extract the ID and use our proxy
+    const driveMatch = fileIdOrUrl.match(/\/d\/([a-zA-Z0-9_-]+)/);
+    if (driveMatch) {
+      return `/api/image/${driveMatch[1]}`;
+    }
+    return fileIdOrUrl;
+  }
+  
+  // Use our proxy API to serve the image
+  return `/api/image/${fileIdOrUrl}`;
+}
+
+/**
  * Reads a report from Google Sheets by report ID
  */
 export async function getReportFromSheets(reportId: string): Promise<FormData | null> {
@@ -309,7 +329,7 @@ export async function getReportFromSheets(reportId: string): Promise<FormData | 
     formData.buildingImages = buildingImageRows.map((row) => ({
       id: row[0] || "",
       file: null,
-      preview: row[6] || "", // This will be the image URL
+      preview: getImageUrl(row[6] || ""), // Construct proper image URL
       caption: row[5] || "",
       uploadStatus: "success" as const,
       uploadedImageId: row[6] || "",
@@ -369,7 +389,7 @@ export async function getReportFromSheets(reportId: string): Promise<FormData | 
         image: imageData ? {
           id: sectionId + "-img",
           file: null,
-          preview: imageData.uploadedImageId, // This will be the image URL
+          preview: getImageUrl(imageData.uploadedImageId), // Construct proper image URL
           caption: imageData.caption,
           uploadStatus: "success" as const,
           uploadedImageId: imageData.uploadedImageId,
