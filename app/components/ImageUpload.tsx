@@ -2,14 +2,15 @@
 
 import React, { useRef, useCallback, useState } from "react";
 import Image from "next/image";
-import heic2any from "heic2any";
 import { generateId } from "../utils/generateId";
 import { ImageWithCaption } from "../types/section";
 
 /**
  * Converts HEIC/HEIF files to JPEG blob
+ * Dynamically imports heic2any to avoid SSR issues
  */
 async function convertHeicToBlob(file: File): Promise<Blob> {
+  const heic2any = (await import("heic2any")).default;
   const result = await heic2any({
     blob: file,
     toType: "image/jpeg",
