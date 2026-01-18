@@ -11,13 +11,25 @@ import { ImageWithCaption } from "../types/section";
  */
 async function convertHeicToBlob(file: File): Promise<Blob> {
   const heic2any = (await import("heic2any")).default;
-  const result = await heic2any({
-    blob: file,
-    toType: "image/jpeg",
-    quality: 0.85,
-  });
+
+  try {
+    const result = await heic2any({
+      blob: file,
+      toType: "image/jpeg",
+      quality: 0.85,
+    });
+
+    return Array.isArray(result) ? result[0] : result;
+  }
+
+  catch (error) {
+    console.error("Error converting HEIC to JPEG:", error);
+    if (error?.message?.includes("Image is already browser readable")) {
+      return file;
+    }
+  }
   // heic2any can return an array of blobs or a single blob
-  return Array.isArray(result) ? result[0] : result;
+
 }
 
 /**
@@ -37,11 +49,11 @@ async function convertToJpegWithCanvas(file: File, quality: number = 0.85): Prom
     img.onload = () => {
       canvas.width = img.width;
       canvas.height = img.height;
-      
+
       // Draw white background (for transparent images)
       ctx.fillStyle = "#FFFFFF";
       ctx.fillRect(0, 0, canvas.width, canvas.height);
-      
+
       // Draw the image
       ctx.drawImage(img, 0, 0);
 
@@ -51,16 +63,16 @@ async function convertToJpegWithCanvas(file: File, quality: number = 0.85): Prom
             reject(new Error("Failed to convert image to JPEG"));
             return;
           }
-          
+
           // Create a new filename with .jpg extension
           const originalName = file.name.replace(/\.[^/.]+$/, "");
           const newFile = new File([blob], `${originalName}.jpg`, {
             type: "image/jpeg",
           });
-          
+
           // Revoke the object URL to free memory
           URL.revokeObjectURL(img.src);
-          
+
           resolve(newFile);
         },
         "image/jpeg",
@@ -83,10 +95,10 @@ async function convertToJpegWithCanvas(file: File, quality: number = 0.85): Prom
  * Handles HEIC/HEIF files specially using heic2any library
  */
 async function convertToJpeg(file: File, quality: number = 0.85): Promise<File> {
-  const isHeic = file.type === "image/heic" || 
-                 file.type === "image/heif" || 
-                 file.name.toLowerCase().endsWith(".heic") || 
-                 file.name.toLowerCase().endsWith(".heif");
+  const isHeic = file.type === "image/heic" ||
+    file.type === "image/heif" ||
+    file.name.toLowerCase().endsWith(".heic") ||
+    file.name.toLowerCase().endsWith(".heif");
 
   if (isHeic) {
     // Convert HEIC to JPEG using heic2any
@@ -125,7 +137,9 @@ async function uploadImage(
   file: File
 ): Promise<{ imageId: string; url?: string }> {
   // Convert image to JPEG before uploading
+  console.log("Converting image to JPEG for upload:", file);
   const jpegFile = await convertToJpeg(file);
+  console.log("Uploading JPEG file:", jpegFile);
   const base64Image = await fileToBase64(jpegFile);
 
   const response = await fetch("/api/upload-image", {
@@ -218,24 +232,40 @@ export default function ImageUpload({
       }
     },
     [updateImageInState]
-  );
+  );  
+  
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files) return;
 
     const remainingSlots = maxImages - images.length;
     const filesToAdd = Array.from(files).slice(0, remainingSlots);
-    
-    // Convert files to JPEG and create previews
-    const newImages: ImageWithCaption[] = await Promise.all(
-      filesToAdd.map(async (file) => {
-        // Check if file is HEIC/HEIF and convert for preview
-        const isHeic = file.type === "image/heic" || 
-                       file.type === "image/heif" || 
-                       file.name.toLowerCase().endsWith(".heic") || 
-                       file.name.toLowerCase().endsWith(".heif");
-        
-        let previewUrl: string;
+
+    // First, create placeholder images with "converting" status
+    const placeholderImages: ImageWithCaption[] = filesToAdd.map((file) => ({
+      id: generateId(),
+      file,
+      preview: "", // Empty preview initially
+      caption: "",
+      uploadStatus: "converting" as const,
+    }));
+
+    // Add placeholders immediately to show converting state
+    const allImagesWithPlaceholders = [...images, ...placeholderImages];
+    imagesRef.current = allImagesWithPlaceholders;
+    onImagesChange(allImagesWithPlaceholders);
+    e.target.value = "";
+
+    // Process each file and update with preview
+    for (const placeholderImage of placeholderImages) {
+      const file = placeholderImage.file!;
+      const isHeic = file.type === "image/heic" ||
+        file.type === "image/heif" ||
+        file.name.toLowerCase().endsWith(".heic") ||
+        file.name.toLowerCase().endsWith(".heif");
+
+      let previewUrl: string;
+      try {
         if (isHeic) {
           // Convert HEIC to JPEG for preview
           const jpegBlob = await convertHeicToBlob(file);
@@ -243,48 +273,63 @@ export default function ImageUpload({
         } else {
           previewUrl = URL.createObjectURL(file);
         }
-        
-        return {
-          id: generateId(),
-          file,
-          preview: previewUrl,
-          caption: "",
-          uploadStatus: "pending" as const,
-        };
-      })
-    );    const allImages = [...images, ...newImages];
-    imagesRef.current = allImages;
-    onImagesChange(allImages);
-    e.target.value = "";
 
-    // Start uploading each new image
-    for (const image of newImages) {
-      handleUploadImage(image);
+        // Update the image with the preview and change status to pending
+        updateImageInState(placeholderImage.id, {
+          preview: previewUrl,
+          uploadStatus: "pending",
+        });
+
+        // Start uploading the image
+        handleUploadImage({ ...placeholderImage, preview: previewUrl, uploadStatus: "pending" });
+      } catch (error) {
+        // If conversion fails, mark as error
+        updateImageInState(placeholderImage.id, {
+          uploadStatus: "error",
+          uploadError: "Failed to process image",
+        });
+      }
     }
-  };const processFiles = useCallback(
+  };
+
+  const processFiles = useCallback(
     async (files: File[]) => {
       const remainingSlots = maxImages - imagesRef.current.length;
       // Filter to only image files (also check extension for HEIC files which may not have proper MIME type)
       const imageFiles = files.filter((file) => {
         const isImageByType = file.type.startsWith("image/");
-        const isHeicByExtension = file.name.toLowerCase().endsWith(".heic") || 
-                                  file.name.toLowerCase().endsWith(".heif");
+        const isHeicByExtension = file.name.toLowerCase().endsWith(".heic") ||
+          file.name.toLowerCase().endsWith(".heif");
         return isImageByType || isHeicByExtension;
       });
       const filesToAdd = imageFiles.slice(0, remainingSlots);
 
       if (filesToAdd.length === 0) return;
 
-      // Convert files to JPEG and create previews (same as handleFileSelect)
-      const newImages: ImageWithCaption[] = await Promise.all(
-        filesToAdd.map(async (file) => {
-          // Check if file is HEIC/HEIF and convert for preview
-          const isHeic = file.type === "image/heic" || 
-                         file.type === "image/heif" || 
-                         file.name.toLowerCase().endsWith(".heic") || 
-                         file.name.toLowerCase().endsWith(".heif");
-          
-          let previewUrl: string;
+      // First, create placeholder images with "converting" status
+      const placeholderImages: ImageWithCaption[] = filesToAdd.map((file) => ({
+        id: generateId(),
+        file,
+        preview: "", // Empty preview initially
+        caption: "",
+        uploadStatus: "converting" as const,
+      }));
+
+      // Add placeholders immediately to show converting state
+      const allImagesWithPlaceholders = [...imagesRef.current, ...placeholderImages];
+      imagesRef.current = allImagesWithPlaceholders;
+      onImagesChange(allImagesWithPlaceholders);
+
+      // Process each file and update with preview
+      for (const placeholderImage of placeholderImages) {
+        const file = placeholderImage.file!;
+        const isHeic = file.type === "image/heic" ||
+          file.type === "image/heif" ||
+          file.name.toLowerCase().endsWith(".heic") ||
+          file.name.toLowerCase().endsWith(".heif");
+
+        let previewUrl: string;
+        try {
           if (isHeic) {
             // Convert HEIC to JPEG for preview
             const jpegBlob = await convertHeicToBlob(file);
@@ -292,27 +337,26 @@ export default function ImageUpload({
           } else {
             previewUrl = URL.createObjectURL(file);
           }
-          
-          return {
-            id: generateId(),
-            file,
+
+          // Update the image with the preview and change status to pending
+          updateImageInState(placeholderImage.id, {
             preview: previewUrl,
-            caption: "",
-            uploadStatus: "pending" as const,
-          };
-        })
-      );
+            uploadStatus: "pending",
+          });
 
-      const allImages = [...imagesRef.current, ...newImages];
-      imagesRef.current = allImages;
-      onImagesChange(allImages);
-
-      // Start uploading each new image
-      for (const image of newImages) {
-        handleUploadImage(image);
+          // Start uploading the image
+          handleUploadImage({ ...placeholderImage, preview: previewUrl, uploadStatus: "pending" });
+        } catch (error) {
+          // If conversion fails, mark as error
+          console.error("Error processing file:", error);
+          updateImageInState(placeholderImage.id, {
+            uploadStatus: "error",
+            uploadError: "Failed to process image",
+          });
+        }
       }
     },
-    [maxImages, onImagesChange, handleUploadImage]
+    [maxImages, onImagesChange, handleUploadImage, updateImageInState]
   );
 
   const handleDragEnter = useCallback((e: React.DragEvent) => {
@@ -374,9 +418,8 @@ export default function ImageUpload({
 
   return (
     <div
-      className={`space-y-4 relative ${
-        isDragging ? "ring-2 ring-blue-500 ring-offset-2 rounded-lg" : ""
-      }`}
+      className={`space-y-4 relative ${isDragging ? "ring-2 ring-blue-500 ring-offset-2 rounded-lg" : ""
+        }`}
       onDragEnter={handleDragEnter}
       onDragLeave={handleDragLeave}
       onDragOver={handleDragOver}
@@ -403,9 +446,8 @@ export default function ImageUpload({
             <span className="text-lg font-medium">Drop images here</span>
             <span className="text-sm">
               {images.length < maxImages
-                ? `${maxImages - images.length} slot${
-                    maxImages - images.length !== 1 ? "s" : ""
-                  } remaining`
+                ? `${maxImages - images.length} slot${maxImages - images.length !== 1 ? "s" : ""
+                } remaining`
                 : "Maximum images reached"}
             </span>
           </div>
@@ -438,58 +480,117 @@ export default function ImageUpload({
             or use the buttons below to upload
           </p>
         </div>
-      )}
-
-      {/* Image previews */}
+      )}      {/* Image previews */}
       {images.length > 0 && (
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {images.map((image, index) => (
-          <div
-            key={image.id}
-            className="relative rounded-lg border border-zinc-200 bg-zinc-50 p-2 dark:border-zinc-700 dark:bg-zinc-800"
-          >
-            <div className="relative aspect-video w-full overflow-hidden rounded-md bg-zinc-200 dark:bg-zinc-700">
-              <Image
-                src={image.preview}
-                alt={image.caption || "Uploaded image"}
-                fill
-                className="object-cover"
-              />
-              {/* Upload status overlay */}
-              {image.uploadStatus === "uploading" && (
-                <div className="absolute inset-0 flex items-center justify-center bg-black/50">
-                  <div className="flex flex-col items-center gap-2">
-                    <svg
-                      className="h-8 w-8 animate-spin text-white"
-                      xmlns="http://www.w3.org/2000/svg"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                    >
-                      <circle
-                        className="opacity-25"
-                        cx="12"
-                        cy="12"
-                        r="10"
-                        stroke="currentColor"
-                        strokeWidth="4"
-                      />
-                      <path
-                        className="opacity-75"
-                        fill="currentColor"
-                        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                      />
-                    </svg>
-                    <span className="text-sm font-medium text-white">
-                      Uploading...
-                    </span>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {images.map((image, index) => (
+            <div
+              key={image.id}
+              className="relative rounded-lg border border-zinc-200 bg-zinc-50 p-2 dark:border-zinc-700 dark:bg-zinc-800"
+            >
+              <div className="relative aspect-video w-full overflow-hidden rounded-md bg-zinc-200 dark:bg-zinc-700">
+                {image.preview && (
+                  <Image
+                    src={image.preview}
+                    alt={image.caption || "Uploaded image"}
+                    fill
+                    className="object-cover"
+                  />
+                )}
+                {/* Converting status overlay */}
+                {image.uploadStatus === "converting" && (
+                  <div className="absolute inset-0 flex items-center justify-center bg-zinc-300 dark:bg-zinc-600">
+                    <div className="flex flex-col items-center gap-2">
+                      <svg
+                        className="h-8 w-8 animate-spin text-zinc-600 dark:text-zinc-300"
+                        xmlns="http://www.w3.org/2000/svg"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                      >
+                        <circle
+                          className="opacity-25"
+                          cx="12"
+                          cy="12"
+                          r="10"
+                          stroke="currentColor"
+                          strokeWidth="4"
+                        />
+                        <path
+                          className="opacity-75"
+                          fill="currentColor"
+                          d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                        />
+                      </svg>
+                      <span className="text-sm font-medium text-zinc-600 dark:text-zinc-300">
+                        Processing...
+                      </span>
+                    </div>
                   </div>
-                </div>
-              )}
-              {image.uploadStatus === "error" && (
-                <div className="absolute inset-0 flex items-center justify-center bg-red-500/70">
-                  <div className="flex flex-col items-center gap-2 px-2 text-center">
+                )}
+                {/* Upload status overlay */}
+                {image.uploadStatus === "uploading" && (
+                  <div className="absolute inset-0 flex items-center justify-center bg-black/50">
+                    <div className="flex flex-col items-center gap-2">
+                      <svg
+                        className="h-8 w-8 animate-spin text-white"
+                        xmlns="http://www.w3.org/2000/svg"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                      >
+                        <circle
+                          className="opacity-25"
+                          cx="12"
+                          cy="12"
+                          r="10"
+                          stroke="currentColor"
+                          strokeWidth="4"
+                        />
+                        <path
+                          className="opacity-75"
+                          fill="currentColor"
+                          d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                        />
+                      </svg>
+                      <span className="text-sm font-medium text-white">
+                        Uploading...
+                      </span>
+                    </div>
+                  </div>
+                )}
+                {image.uploadStatus === "error" && (
+                  <div className="absolute inset-0 flex items-center justify-center bg-red-500/70">
+                    <div className="flex flex-col items-center gap-2 px-2 text-center">
+                      <svg
+                        className="h-8 w-8 text-white"
+                        xmlns="http://www.w3.org/2000/svg"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                        />
+                      </svg>
+                      <span className="text-xs font-medium text-white">
+                        {image.uploadError || "Upload failed"}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => handleRetryUpload(image)}
+                        className="rounded bg-white px-2 py-1 text-xs font-medium text-red-600 hover:bg-red-50"
+                      >
+                        Retry
+                      </button>
+                    </div>
+                  </div>
+                )}
+                {image.uploadStatus === "success" && (
+                  <div className="absolute right-1 top-1 flex h-6 w-6 items-center justify-center rounded-full bg-green-500 text-white">
                     <svg
-                      className="h-8 w-8 text-white"
+                      className="h-4 w-4"
                       xmlns="http://www.w3.org/2000/svg"
                       fill="none"
                       viewBox="0 0 24 24"
@@ -499,59 +600,30 @@ export default function ImageUpload({
                         strokeLinecap="round"
                         strokeLinejoin="round"
                         strokeWidth={2}
-                        d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                        d="M5 13l4 4L19 7"
                       />
                     </svg>
-                    <span className="text-xs font-medium text-white">
-                      {image.uploadError || "Upload failed"}
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => handleRetryUpload(image)}
-                      className="rounded bg-white px-2 py-1 text-xs font-medium text-red-600 hover:bg-red-50"
-                    >
-                      Retry
-                    </button>
                   </div>
-                </div>
-              )}
-              {image.uploadStatus === "success" && (
-                <div className="absolute right-1 top-1 flex h-6 w-6 items-center justify-center rounded-full bg-green-500 text-white">
-                  <svg
-                    className="h-4 w-4"
-                    xmlns="http://www.w3.org/2000/svg"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M5 13l4 4L19 7"
-                    />
-                  </svg>
-                </div>
-              )}
+                )}
+              </div>
+              {isWithCaption && index != 0 && (
+                <input
+                  type="text"
+                  placeholder="Enter caption..."
+                  value={image.caption}
+                  onChange={(e) => handleCaptionChange(image.id, e.target.value)}
+                  className="mt-2 w-full rounded-md border border-zinc-300 bg-white px-3 py-1.5 text-sm text-zinc-900 placeholder-zinc-400 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-zinc-600 dark:bg-zinc-700 dark:text-zinc-100 dark:placeholder-zinc-500"
+                />
+              )}            <button
+                type="button"
+                onClick={() => handleRemoveImage(image.id)}
+                className="absolute -right-2 -top-2 flex h-6 w-6 items-center justify-center rounded-full bg-red-500 text-white shadow-md hover:bg-red-600"
+              >
+                ×
+              </button>
             </div>
-            {isWithCaption && index != 0 && (
-              <input
-                type="text"
-                placeholder="Enter caption..."
-                value={image.caption}
-                onChange={(e) => handleCaptionChange(image.id, e.target.value)}
-                className="mt-2 w-full rounded-md border border-zinc-300 bg-white px-3 py-1.5 text-sm text-zinc-900 placeholder-zinc-400 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-zinc-600 dark:bg-zinc-700 dark:text-zinc-100 dark:placeholder-zinc-500"
-              />
-            )}            <button
-              type="button"
-              onClick={() => handleRemoveImage(image.id)}
-              className="absolute -right-2 -top-2 flex h-6 w-6 items-center justify-center rounded-full bg-red-500 text-white shadow-md hover:bg-red-600"
-            >
-              ×
-            </button>
-          </div>
-        ))}
-      </div>
+          ))}
+        </div>
       )}
 
       {/* Upload buttons */}
