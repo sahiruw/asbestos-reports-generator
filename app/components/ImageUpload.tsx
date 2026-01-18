@@ -218,24 +218,38 @@ export default function ImageUpload({
       }
     },
     [updateImageInState]
-  );
-  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  );  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files) return;
 
     const remainingSlots = maxImages - images.length;
     const filesToAdd = Array.from(files).slice(0, remainingSlots);
     
-    // Convert files to JPEG and create previews
-    const newImages: ImageWithCaption[] = await Promise.all(
-      filesToAdd.map(async (file) => {
-        // Check if file is HEIC/HEIF and convert for preview
-        const isHeic = file.type === "image/heic" || 
-                       file.type === "image/heif" || 
-                       file.name.toLowerCase().endsWith(".heic") || 
-                       file.name.toLowerCase().endsWith(".heif");
-        
-        let previewUrl: string;
+    // First, create placeholder images with "converting" status
+    const placeholderImages: ImageWithCaption[] = filesToAdd.map((file) => ({
+      id: generateId(),
+      file,
+      preview: "", // Empty preview initially
+      caption: "",
+      uploadStatus: "converting" as const,
+    }));
+
+    // Add placeholders immediately to show converting state
+    const allImagesWithPlaceholders = [...images, ...placeholderImages];
+    imagesRef.current = allImagesWithPlaceholders;
+    onImagesChange(allImagesWithPlaceholders);
+    e.target.value = "";
+
+    // Process each file and update with preview
+    for (const placeholderImage of placeholderImages) {
+      const file = placeholderImage.file!;
+      const isHeic = file.type === "image/heic" || 
+                     file.type === "image/heif" || 
+                     file.name.toLowerCase().endsWith(".heic") || 
+                     file.name.toLowerCase().endsWith(".heif");
+      
+      let previewUrl: string;
+      try {
         if (isHeic) {
           // Convert HEIC to JPEG for preview
           const jpegBlob = await convertHeicToBlob(file);
@@ -244,22 +258,21 @@ export default function ImageUpload({
           previewUrl = URL.createObjectURL(file);
         }
         
-        return {
-          id: generateId(),
-          file,
+        // Update the image with the preview and change status to pending
+        updateImageInState(placeholderImage.id, {
           preview: previewUrl,
-          caption: "",
-          uploadStatus: "pending" as const,
-        };
-      })
-    );    const allImages = [...images, ...newImages];
-    imagesRef.current = allImages;
-    onImagesChange(allImages);
-    e.target.value = "";
-
-    // Start uploading each new image
-    for (const image of newImages) {
-      handleUploadImage(image);
+          uploadStatus: "pending",
+        });
+        
+        // Start uploading the image
+        handleUploadImage({ ...placeholderImage, preview: previewUrl, uploadStatus: "pending" });
+      } catch (error) {
+        // If conversion fails, mark as error
+        updateImageInState(placeholderImage.id, {
+          uploadStatus: "error",
+          uploadError: "Failed to process image",
+        });
+      }
     }
   };const processFiles = useCallback(
     async (files: File[]) => {
@@ -275,16 +288,30 @@ export default function ImageUpload({
 
       if (filesToAdd.length === 0) return;
 
-      // Convert files to JPEG and create previews (same as handleFileSelect)
-      const newImages: ImageWithCaption[] = await Promise.all(
-        filesToAdd.map(async (file) => {
-          // Check if file is HEIC/HEIF and convert for preview
-          const isHeic = file.type === "image/heic" || 
-                         file.type === "image/heif" || 
-                         file.name.toLowerCase().endsWith(".heic") || 
-                         file.name.toLowerCase().endsWith(".heif");
-          
-          let previewUrl: string;
+      // First, create placeholder images with "converting" status
+      const placeholderImages: ImageWithCaption[] = filesToAdd.map((file) => ({
+        id: generateId(),
+        file,
+        preview: "", // Empty preview initially
+        caption: "",
+        uploadStatus: "converting" as const,
+      }));
+
+      // Add placeholders immediately to show converting state
+      const allImagesWithPlaceholders = [...imagesRef.current, ...placeholderImages];
+      imagesRef.current = allImagesWithPlaceholders;
+      onImagesChange(allImagesWithPlaceholders);
+
+      // Process each file and update with preview
+      for (const placeholderImage of placeholderImages) {
+        const file = placeholderImage.file!;
+        const isHeic = file.type === "image/heic" || 
+                       file.type === "image/heif" || 
+                       file.name.toLowerCase().endsWith(".heic") || 
+                       file.name.toLowerCase().endsWith(".heif");
+        
+        let previewUrl: string;
+        try {
           if (isHeic) {
             // Convert HEIC to JPEG for preview
             const jpegBlob = await convertHeicToBlob(file);
@@ -293,26 +320,24 @@ export default function ImageUpload({
             previewUrl = URL.createObjectURL(file);
           }
           
-          return {
-            id: generateId(),
-            file,
+          // Update the image with the preview and change status to pending
+          updateImageInState(placeholderImage.id, {
             preview: previewUrl,
-            caption: "",
-            uploadStatus: "pending" as const,
-          };
-        })
-      );
-
-      const allImages = [...imagesRef.current, ...newImages];
-      imagesRef.current = allImages;
-      onImagesChange(allImages);
-
-      // Start uploading each new image
-      for (const image of newImages) {
-        handleUploadImage(image);
+            uploadStatus: "pending",
+          });
+          
+          // Start uploading the image
+          handleUploadImage({ ...placeholderImage, preview: previewUrl, uploadStatus: "pending" });
+        } catch (error) {
+          // If conversion fails, mark as error
+          updateImageInState(placeholderImage.id, {
+            uploadStatus: "error",
+            uploadError: "Failed to process image",
+          });
+        }
       }
     },
-    [maxImages, onImagesChange, handleUploadImage]
+    [maxImages, onImagesChange, handleUploadImage, updateImageInState]
   );
 
   const handleDragEnter = useCallback((e: React.DragEvent) => {
@@ -438,9 +463,7 @@ export default function ImageUpload({
             or use the buttons below to upload
           </p>
         </div>
-      )}
-
-      {/* Image previews */}
+      )}      {/* Image previews */}
       {images.length > 0 && (
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {images.map((image, index) => (
@@ -449,12 +472,44 @@ export default function ImageUpload({
             className="relative rounded-lg border border-zinc-200 bg-zinc-50 p-2 dark:border-zinc-700 dark:bg-zinc-800"
           >
             <div className="relative aspect-video w-full overflow-hidden rounded-md bg-zinc-200 dark:bg-zinc-700">
-              <Image
-                src={image.preview}
-                alt={image.caption || "Uploaded image"}
-                fill
-                className="object-cover"
-              />
+              {image.preview && (
+                <Image
+                  src={image.preview}
+                  alt={image.caption || "Uploaded image"}
+                  fill
+                  className="object-cover"
+                />
+              )}
+              {/* Converting status overlay */}
+              {image.uploadStatus === "converting" && (
+                <div className="absolute inset-0 flex items-center justify-center bg-zinc-300 dark:bg-zinc-600">
+                  <div className="flex flex-col items-center gap-2">
+                    <svg
+                      className="h-8 w-8 animate-spin text-zinc-600 dark:text-zinc-300"
+                      xmlns="http://www.w3.org/2000/svg"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                    >
+                      <circle
+                        className="opacity-25"
+                        cx="12"
+                        cy="12"
+                        r="10"
+                        stroke="currentColor"
+                        strokeWidth="4"
+                      />
+                      <path
+                        className="opacity-75"
+                        fill="currentColor"
+                        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                      />
+                    </svg>
+                    <span className="text-sm font-medium text-zinc-600 dark:text-zinc-300">
+                      Processing...
+                    </span>
+                  </div>
+                </div>
+              )}
               {/* Upload status overlay */}
               {image.uploadStatus === "uploading" && (
                 <div className="absolute inset-0 flex items-center justify-center bg-black/50">

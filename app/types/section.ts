@@ -42,7 +42,7 @@ export interface FormData {
   sections: SectionData[];
 }
 
-export type ImageUploadStatus = "pending" | "uploading" | "success" | "error";
+export type ImageUploadStatus = "converting" | "pending" | "uploading" | "success" | "error";
 
 export interface ImageWithCaption {
   id: string;
