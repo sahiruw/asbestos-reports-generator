@@ -20,13 +20,13 @@ async function convertHeicToBlob(file: File): Promise<Blob> {
     });
 
     return Array.isArray(result) ? result[0] : result;
-  }
-
-  catch (error) {
+  } catch (error) {
     console.error("Error converting HEIC to JPEG:", error);
-    if (error?.message?.includes("Image is already browser readable")) {
+    if (error && (error as any).message && (error as any).message.includes("Image is already browser readable")) {
       return file;
     }
+    // As a safe fallback return the original file (File extends Blob) so the return type is always satisfied.
+    return file;
   }
   // heic2any can return an array of blobs or a single blob
 
