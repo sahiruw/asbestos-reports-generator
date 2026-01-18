@@ -2,8 +2,103 @@
 
 import React, { useRef, useCallback } from "react";
 import Image from "next/image";
+import heic2any from "heic2any";
 import { generateId } from "../utils/generateId";
 import { ImageWithCaption } from "../types/section";
+
+/**
+ * Converts HEIC/HEIF files to JPEG blob
+ */
+async function convertHeicToBlob(file: File): Promise<Blob> {
+  const result = await heic2any({
+    blob: file,
+    toType: "image/jpeg",
+    quality: 0.85,
+  });
+  // heic2any can return an array of blobs or a single blob
+  return Array.isArray(result) ? result[0] : result;
+}
+
+/**
+ * Converts an image file to JPEG format using Canvas (for non-HEIC files)
+ */
+async function convertToJpegWithCanvas(file: File, quality: number = 0.85): Promise<File> {
+  return new Promise((resolve, reject) => {
+    const img = document.createElement("img");
+    const canvas = document.createElement("canvas");
+    const ctx = canvas.getContext("2d");
+
+    if (!ctx) {
+      reject(new Error("Failed to get canvas context"));
+      return;
+    }
+
+    img.onload = () => {
+      canvas.width = img.width;
+      canvas.height = img.height;
+      
+      // Draw white background (for transparent images)
+      ctx.fillStyle = "#FFFFFF";
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      
+      // Draw the image
+      ctx.drawImage(img, 0, 0);
+
+      canvas.toBlob(
+        (blob) => {
+          if (!blob) {
+            reject(new Error("Failed to convert image to JPEG"));
+            return;
+          }
+          
+          // Create a new filename with .jpg extension
+          const originalName = file.name.replace(/\.[^/.]+$/, "");
+          const newFile = new File([blob], `${originalName}.jpg`, {
+            type: "image/jpeg",
+          });
+          
+          // Revoke the object URL to free memory
+          URL.revokeObjectURL(img.src);
+          
+          resolve(newFile);
+        },
+        "image/jpeg",
+        quality
+      );
+    };
+
+    img.onerror = () => {
+      URL.revokeObjectURL(img.src);
+      reject(new Error("Failed to load image for conversion"));
+    };
+
+    // Create object URL for the image
+    img.src = URL.createObjectURL(file);
+  });
+}
+
+/**
+ * Converts an image file to JPEG format
+ * Handles HEIC/HEIF files specially using heic2any library
+ */
+async function convertToJpeg(file: File, quality: number = 0.85): Promise<File> {
+  const isHeic = file.type === "image/heic" || 
+                 file.type === "image/heif" || 
+                 file.name.toLowerCase().endsWith(".heic") || 
+                 file.name.toLowerCase().endsWith(".heif");
+
+  if (isHeic) {
+    // Convert HEIC to JPEG using heic2any
+    const jpegBlob = await convertHeicToBlob(file);
+    const originalName = file.name.replace(/\.[^/.]+$/, "");
+    return new File([jpegBlob], `${originalName}.jpg`, {
+      type: "image/jpeg",
+    });
+  }
+
+  // For other formats, use canvas conversion
+  return convertToJpegWithCanvas(file, quality);
+}
 
 /**
  * Converts a File to base64 string
@@ -23,12 +118,14 @@ async function fileToBase64(file: File): Promise<string> {
 }
 
 /**
- * Uploads an image to the server
+ * Uploads an image to the server (converts to JPEG first)
  */
 async function uploadImage(
   file: File
 ): Promise<{ imageId: string; url?: string }> {
-  const base64Image = await fileToBase64(file);
+  // Convert image to JPEG before uploading
+  const jpegFile = await convertToJpeg(file);
+  const base64Image = await fileToBase64(jpegFile);
 
   const response = await fetch("/api/upload-image", {
     method: "POST",
@@ -37,7 +134,7 @@ async function uploadImage(
     },
     body: JSON.stringify({
       base64Image,
-      filename: file.name,
+      filename: jpegFile.name,
     }),
   });
 
