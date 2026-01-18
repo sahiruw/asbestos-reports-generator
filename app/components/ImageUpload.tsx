@@ -218,7 +218,9 @@ export default function ImageUpload({
       }
     },
     [updateImageInState]
-  );  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  );  
+  
+  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files) return;
 
