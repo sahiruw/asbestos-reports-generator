@@ -358,12 +358,13 @@ export default function ImageUpload({
     },
     [maxImages, onImagesChange, handleUploadImage, updateImageInState]
   );
-
   const handleDragEnter = useCallback((e: React.DragEvent) => {
     e.preventDefault();
     e.stopPropagation();
     dragCounterRef.current++;
-    if (e.dataTransfer.types.includes("Files")) {
+    // Check for Files or URL types (for browser-dragged images)
+    const types = e.dataTransfer.types;
+    if (types.includes("Files") || types.includes("text/uri-list") || types.includes("text/html")) {
       setIsDragging(true);
     }
   }, []);
@@ -381,17 +382,72 @@ export default function ImageUpload({
     e.preventDefault();
     e.stopPropagation();
   }, []);
-
   const handleDrop = useCallback(
-    (e: React.DragEvent) => {
+    async (e: React.DragEvent) => {
       e.preventDefault();
       e.stopPropagation();
       setIsDragging(false);
       dragCounterRef.current = 0;
 
+      // First, try to get files directly (works for local files on all platforms)
       const files = e.dataTransfer.files;
       if (files && files.length > 0) {
         processFiles(Array.from(files));
+        return;
+      }
+
+      // For browser-dragged images (especially on Mac), try to extract from dataTransfer.items
+      const items = e.dataTransfer.items;
+      if (items && items.length > 0) {
+        const filePromises: Promise<File | null>[] = [];
+
+        for (let i = 0; i < items.length; i++) {
+          const item = items[i];
+          
+          // Try to get file from item (works for some browser drag scenarios)
+          if (item.kind === "file") {
+            const file = item.getAsFile();
+            if (file && file.type.startsWith("image/")) {
+              filePromises.push(Promise.resolve(file));
+            }
+          }
+          // Handle image URLs dragged from browser (Mac Safari/Chrome)
+          else if (item.kind === "string" && item.type === "text/uri-list") {
+            filePromises.push(
+              new Promise((resolve) => {
+                item.getAsString(async (url) => {
+                  try {
+                    // Fetch the image from the URL
+                    const response = await fetch(url);
+                    if (!response.ok) {
+                      resolve(null);
+                      return;
+                    }
+                    const blob = await response.blob();
+                    if (!blob.type.startsWith("image/")) {
+                      resolve(null);
+                      return;
+                    }
+                    // Create a File from the blob
+                    const filename = url.split("/").pop()?.split("?")[0] || "image";
+                    const extension = blob.type.split("/")[1] || "jpg";
+                    const file = new File([blob], `${filename}.${extension}`, { type: blob.type });
+                    resolve(file);
+                  } catch {
+                    resolve(null);
+                  }
+                });
+              })
+            );
+          }
+        }
+
+        const resolvedFiles = await Promise.all(filePromises);
+        const validFiles = resolvedFiles.filter((f): f is File => f !== null);
+        
+        if (validFiles.length > 0) {
+          processFiles(validFiles);
+        }
       }
     },
     [processFiles]
