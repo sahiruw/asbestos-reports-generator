@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "googleapis": "^168.0.0",
+    "heic2any": "^0.0.4",
     "next": "16.0.10",
     "react": "19.2.1",
     "react-dom": "19.2.1"
