@@ -251,30 +251,56 @@ export default function ImageUpload({
           uploadStatus: "pending" as const,
         };
       })
-    );
-
-    const allImages = [...images, ...newImages];
+    );    const allImages = [...images, ...newImages];
     imagesRef.current = allImages;
     onImagesChange(allImages);
     e.target.value = "";
-  };
 
-  const processFiles = useCallback(
-    (files: File[]) => {
+    // Start uploading each new image
+    for (const image of newImages) {
+      handleUploadImage(image);
+    }
+  };const processFiles = useCallback(
+    async (files: File[]) => {
       const remainingSlots = maxImages - imagesRef.current.length;
-      // Filter to only image files
-      const imageFiles = files.filter((file) => file.type.startsWith("image/"));
+      // Filter to only image files (also check extension for HEIC files which may not have proper MIME type)
+      const imageFiles = files.filter((file) => {
+        const isImageByType = file.type.startsWith("image/");
+        const isHeicByExtension = file.name.toLowerCase().endsWith(".heic") || 
+                                  file.name.toLowerCase().endsWith(".heif");
+        return isImageByType || isHeicByExtension;
+      });
       const filesToAdd = imageFiles.slice(0, remainingSlots);
 
       if (filesToAdd.length === 0) return;
 
-      const newImages: ImageWithCaption[] = filesToAdd.map((file) => ({
-        id: generateId(),
-        file,
-        preview: URL.createObjectURL(file),
-        caption: "",
-        uploadStatus: "pending" as const,
-      }));
+      // Convert files to JPEG and create previews (same as handleFileSelect)
+      const newImages: ImageWithCaption[] = await Promise.all(
+        filesToAdd.map(async (file) => {
+          // Check if file is HEIC/HEIF and convert for preview
+          const isHeic = file.type === "image/heic" || 
+                         file.type === "image/heif" || 
+                         file.name.toLowerCase().endsWith(".heic") || 
+                         file.name.toLowerCase().endsWith(".heif");
+          
+          let previewUrl: string;
+          if (isHeic) {
+            // Convert HEIC to JPEG for preview
+            const jpegBlob = await convertHeicToBlob(file);
+            previewUrl = URL.createObjectURL(jpegBlob);
+          } else {
+            previewUrl = URL.createObjectURL(file);
+          }
+          
+          return {
+            id: generateId(),
+            file,
+            preview: previewUrl,
+            caption: "",
+            uploadStatus: "pending" as const,
+          };
+        })
+      );
 
       const allImages = [...imagesRef.current, ...newImages];
       imagesRef.current = allImages;
