@@ -216,20 +216,40 @@ export default function ImageUpload({
     },
     [updateImageInState]
   );
-
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files) return;
 
     const remainingSlots = maxImages - images.length;
     const filesToAdd = Array.from(files).slice(0, remainingSlots);
-    const newImages: ImageWithCaption[] = filesToAdd.map((file) => ({
-      id: generateId(),
-      file,
-      preview: URL.createObjectURL(file),
-      caption: "",
-      uploadStatus: "pending" as const,
-    }));
+    
+    // Convert files to JPEG and create previews
+    const newImages: ImageWithCaption[] = await Promise.all(
+      filesToAdd.map(async (file) => {
+        // Check if file is HEIC/HEIF and convert for preview
+        const isHeic = file.type === "image/heic" || 
+                       file.type === "image/heif" || 
+                       file.name.toLowerCase().endsWith(".heic") || 
+                       file.name.toLowerCase().endsWith(".heif");
+        
+        let previewUrl: string;
+        if (isHeic) {
+          // Convert HEIC to JPEG for preview
+          const jpegBlob = await convertHeicToBlob(file);
+          previewUrl = URL.createObjectURL(jpegBlob);
+        } else {
+          previewUrl = URL.createObjectURL(file);
+        }
+        
+        return {
+          id: generateId(),
+          file,
+          preview: previewUrl,
+          caption: "",
+          uploadStatus: "pending" as const,
+        };
+      })
+    );
 
     const allImages = [...images, ...newImages];
     imagesRef.current = allImages;
