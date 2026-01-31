@@ -234,9 +234,9 @@ export default function ImageUpload({
       }
     },
     [updateImageInState]
-  );  
-  
-  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  ); 
+
+    const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files) return;
 
@@ -248,7 +248,7 @@ export default function ImageUpload({
       id: generateId(),
       file,
       preview: "", // Empty preview initially
-      caption: "",
+      caption: "View showing the",
       uploadStatus: "converting" as const,
     }));
 
@@ -305,7 +305,7 @@ export default function ImageUpload({
         return isImageByType || isHeicByExtension;
       });
       const filesToAdd = imageFiles.slice(0, remainingSlots);
-
+      
       if (filesToAdd.length === 0) return;
 
       // First, create placeholder images with "converting" status
@@ -313,7 +313,7 @@ export default function ImageUpload({
         id: generateId(),
         file,
         preview: "", // Empty preview initially
-        caption: "",
+        caption: "View showing the",
         uploadStatus: "converting" as const,
       }));
 
