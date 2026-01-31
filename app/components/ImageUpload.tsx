@@ -184,6 +184,8 @@ export default function ImageUpload({
   const imagesRef = useRef<ImageWithCaption[]>(images);
   const [isDragging, setIsDragging] = useState(false);
   const dragCounterRef = useRef(0);
+  const [draggedImageId, setDraggedImageId] = useState<string | null>(null);
+  const [dragOverImageId, setDragOverImageId] = useState<string | null>(null);
 
   // Keep ref in sync with images prop
   React.useEffect(() => {
@@ -232,9 +234,9 @@ export default function ImageUpload({
       }
     },
     [updateImageInState]
-  );  
-  
-  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  ); 
+
+    const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files) return;
 
@@ -246,7 +248,7 @@ export default function ImageUpload({
       id: generateId(),
       file,
       preview: "", // Empty preview initially
-      caption: "",
+      caption: "View showing the",
       uploadStatus: "converting" as const,
     }));
 
@@ -303,7 +305,7 @@ export default function ImageUpload({
         return isImageByType || isHeicByExtension;
       });
       const filesToAdd = imageFiles.slice(0, remainingSlots);
-
+      
       if (filesToAdd.length === 0) return;
 
       // First, create placeholder images with "converting" status
@@ -311,7 +313,7 @@ export default function ImageUpload({
         id: generateId(),
         file,
         preview: "", // Empty preview initially
-        caption: "",
+        caption: "View showing the",
         uploadStatus: "converting" as const,
       }));
 
@@ -472,6 +474,68 @@ export default function ImageUpload({
     onImagesChange(images.filter((img) => img.id !== id));
   };
 
+  // Image reordering handlers
+  const handleImageDragStart = (e: React.DragEvent, imageId: string) => {
+    setDraggedImageId(imageId);
+    e.dataTransfer.effectAllowed = "move";
+    e.dataTransfer.setData("text/plain", imageId);
+    // Add a slight delay to show the drag effect
+    setTimeout(() => {
+      const element = e.target as HTMLElement;
+      element.style.opacity = "0.5";
+    }, 0);
+  };
+
+  const handleImageDragEnd = (e: React.DragEvent) => {
+    setDraggedImageId(null);
+    setDragOverImageId(null);
+    const element = e.target as HTMLElement;
+    element.style.opacity = "1";
+  };
+
+  const handleImageDragOver = (e: React.DragEvent, imageId: string) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (draggedImageId && draggedImageId !== imageId) {
+      setDragOverImageId(imageId);
+    }
+  };
+
+  const handleImageDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    setDragOverImageId(null);
+  };
+
+  const handleImageDropOnImage = (e: React.DragEvent, targetImageId: string) => {
+    e.preventDefault();
+    e.stopPropagation();
+    
+    if (!draggedImageId || draggedImageId === targetImageId) {
+      setDraggedImageId(null);
+      setDragOverImageId(null);
+      return;
+    }
+
+    const draggedIndex = images.findIndex((img) => img.id === draggedImageId);
+    const targetIndex = images.findIndex((img) => img.id === targetImageId);
+
+    if (draggedIndex === -1 || targetIndex === -1) {
+      setDraggedImageId(null);
+      setDragOverImageId(null);
+      return;
+    }
+
+    // Reorder the images
+    const newImages = [...images];
+    const [draggedImage] = newImages.splice(draggedIndex, 1);
+    newImages.splice(targetIndex, 0, draggedImage);
+
+    imagesRef.current = newImages;
+    onImagesChange(newImages);
+    setDraggedImageId(null);
+    setDragOverImageId(null);
+  };
+
   return (
     <div
       className={`space-y-4 relative ${isDragging ? "ring-2 ring-blue-500 ring-offset-2 rounded-lg" : ""
@@ -510,6 +574,11 @@ export default function ImageUpload({
         </div>
       )}      <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300">
         {label} ({images.length}/{maxImages})
+        {images.length > 1 && (
+          <span className="ml-2 text-xs font-normal text-zinc-500 dark:text-zinc-400">
+            — Drag to reorder
+          </span>
+        )}
       </label>
 
       {/* Drop zone hint when no images */}
@@ -535,16 +604,47 @@ export default function ImageUpload({
           <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-500">
             or use the buttons below to upload
           </p>
-        </div>
-      )}      {/* Image previews */}
+        </div>      
+      )}      
+      
+      {/* Image previews */}
       {images.length > 0 && (
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {images.map((image, index) => (
             <div
               key={image.id}
-              className="relative rounded-lg border border-zinc-200 bg-zinc-50 p-2 dark:border-zinc-700 dark:bg-zinc-800"
+              className={`relative rounded-lg border border-zinc-200 bg-zinc-50 p-2 dark:border-zinc-700 dark:bg-zinc-800 cursor-move transition-all ${
+                dragOverImageId === image.id ? "ring-2 ring-blue-500 scale-105" : ""
+              } ${draggedImageId === image.id ? "opacity-50" : ""}`}
+              draggable
+              onDragStart={(e) => handleImageDragStart(e, image.id)}
+              onDragEnd={handleImageDragEnd}
+              onDragOver={(e) => handleImageDragOver(e, image.id)}
+              onDragLeave={handleImageDragLeave}
+              onDrop={(e) => handleImageDropOnImage(e, image.id)}
             >
+              {/* Image number indicator */}
+              <div className="absolute left-3 top-3 z-20 flex h-6 min-w-6 items-center justify-center rounded bg-black/40 px-1 text-xs font-medium text-white">
+                {index + 1}
+              </div>
               <div className="relative aspect-video w-full overflow-hidden rounded-md bg-zinc-200 dark:bg-zinc-700">
+                {/* Drag handle indicator - covers image area only */}
+                <div className="absolute inset-0 z-10 flex items-center justify-center bg-black/0 text-white opacity-0 hover:bg-black/30 hover:opacity-100 transition-all">
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    className="h-8 w-8 drop-shadow-lg"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M4 8h16M4 16h16"
+                    />
+                  </svg>
+                </div>
                 {image.preview && (
                   <Image
                     src={image.preview}
