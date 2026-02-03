@@ -21,16 +21,14 @@ export default function SectionForm({
   defaults,
   onUploadingChange,
 }: SectionFormProps) {
-
   const handleChange = (
     field: keyof SectionData,
-    value: string | boolean | number | ImageWithCaption | null
+    value: string | boolean | number | ImageWithCaption | ImageWithCaption[] | null
   ) => {
     onUpdate({ ...section, [field]: value });
   };
-
   const handleImageChange = (images: ImageWithCaption[]) => {
-    handleChange("image", images.length > 0 ? images[0] : null);
+    handleChange("images", images);
   };
 
   const createClearedSection = (itemMaterialProduct: string, location: string, isLicensed: boolean): SectionData => {
@@ -60,7 +58,7 @@ export default function SectionForm({
       actionManageAccess: "",
       specificRecommendations: "Re-inspect / See Comment Sheet for More Details",
       isLicensed,
-      image: null,
+      images: [],
     };
 
     if (itemMaterialProduct && defaults[itemMaterialProduct]?.[location]) {
@@ -524,14 +522,16 @@ export default function SectionForm({
             />
           </div>
         </div>
-      </div>      {/* Section Image */}
+      </div>      
+      
+      {/* Section Images */}
       <div className="mt-4">
         <ImageUpload
-          images={section.image ? [section.image] : []}
-          maxImages={1}
+          images={section.images || []}
+          maxImages={4}
           onImagesChange={handleImageChange}
           onUploadingChange={onUploadingChange}
-          label="Section Image"
+          label="Section Images"
           isWithCaption= {false}
         />
       </div>
