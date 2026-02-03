@@ -201,12 +201,12 @@ function prepareSectionSheetRows(
       section.actionSafeSystemOfWork || "",
       section.actionRemoveCompetentContractor || "",
       section.actionRemoveLicensedContractor || "",
-      section.actionManageAccess || "",
+      section.actionManageAccess || "",      
       // Additional fields
       section.specificRecommendations || "",
       section.isLicensed ? "Yes" : "No",
       // Has image flag
-      section.image ? "Yes" : "No",
+      section.images && section.images.length > 0 ? "Yes" : "No",
     ];
   });
 }
@@ -234,21 +234,23 @@ function prepareImageSheetRows(
       image.uploadedImageId || "", // Uploaded image ID from the image service
     ]);
   });
-
+  
   // Add section images
   formData.sections.forEach((section, sectionIndex) => {
-    if (section.image) {
+    if (section.images && section.images.length > 0) {
       const sectionId = `${reportId}-SEC-${String(sectionIndex + 1).padStart(3, "0")}`;
-      const imageId = `${reportId}-IMG-SEC-${String(sectionIndex + 1).padStart(3, "0")}`;
-      rows.push([
-        imageId,
-        reportId,
-        sectionId,
-        "section", // Image type
-        1, // Image order within section (always 1 since each section has max 1 image)
-        section.image.caption || "",
-        section.image.uploadedImageId || "", // Uploaded image ID from the image service
-      ]);
+      section.images.forEach((image, imageIndex) => {
+        const imageId = `${reportId}-IMG-SEC-${String(sectionIndex + 1).padStart(3, "0")}-${String(imageIndex + 1).padStart(2, "0")}`;
+        rows.push([
+          imageId,
+          reportId,
+          sectionId,
+          "section", // Image type
+          imageIndex + 1, // Image order within section
+          image.caption || "",
+          image.uploadedImageId || "", // Uploaded image ID from the image service
+        ]);
+      });
     }
   });
 

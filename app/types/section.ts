@@ -11,7 +11,7 @@ export interface SectionData {
   isExternal: boolean;
   accessibility: string;
   condition: string;
-  image: ImageWithCaption | null;
+  images: ImageWithCaption[];
   // Material Assessment Algorithm
   productType: number; // 1-3
   damageDeteriorationScore: number; // 0-3
