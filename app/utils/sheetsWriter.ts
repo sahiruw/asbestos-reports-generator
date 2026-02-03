@@ -234,7 +234,7 @@ function prepareImageSheetRows(
       image.uploadedImageId || "", // Uploaded image ID from the image service
     ]);
   });
-  
+
   // Add section images
   formData.sections.forEach((section, sectionIndex) => {
     if (section.images && section.images.length > 0) {
@@ -432,15 +432,15 @@ export async function getReportFromSheets(reportId: string): Promise<FormData | 
         // Additional fields
         specificRecommendations: row[25] || "",
         isLicensed: row[26] === "Yes",
-        // Image
-        image: imageData ? {
+        // Images (SectionData expects an images array)
+        images: imageData ? [{
           id: sectionId + "-img",
           file: null,
           preview: getImageUrl(imageData.uploadedImageId), // Construct proper image URL
           caption: imageData.caption,
           uploadStatus: "success" as const,
           uploadedImageId: imageData.uploadedImageId,
-        } : null,
+        }] : [],
       } as SectionData;
     });
 
